@@ -168,4 +168,3 @@ async def memory_extract(body: MemoryExtractRequest) -> list[dict[str, Any]]:
     """
     mm = main._require_memory()
     return mm.auto_extract(body.user_message, body.assistant_response)
-

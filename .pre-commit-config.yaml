@@ -1,0 +1,38 @@
+# .pre-commit-config.yaml — pre-commit hooks (M26.26).
+#
+# Fast, deterministic gates that run BEFORE a commit is made — lint + types +
+# hygiene. The full pytest/vitest suites stay in CI / `task ci` (too slow for
+# every commit). Activate once per clone:  pre-commit install  (or: task hooks:install)
+#
+# The ruff/mypy versions here MUST match the pins in requirements.txt — a
+# mismatch means pre-commit and CI disagree. Bump them together (see INVARIANTS).
+# Emergency bypass:  git commit --no-verify
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.11 # keep in lockstep with ruff in requirements.txt
+    hooks:
+      - id: ruff # lint (check only — matches CI; run `task lint:fix` to auto-fix)
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files # blocks an accidental big blob (default 500KB)
+      - id: detect-private-key # cheap secret guard
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (project config)
+        # `local` + system mypy so it matches `task typecheck` exactly (the
+        # project config in pyproject drives it); mirror-envs don't see our deps.
+        entry: mypy
+        language: system
+        types: [python]
+        pass_filenames: false
+        args: ["."]

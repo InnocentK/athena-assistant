@@ -198,4 +198,3 @@ async def nextcloud_activity(
         raise HTTPException(status_code=504, detail="Nextcloud server did not respond in time.") from None
     except NextcloudConnectionError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-

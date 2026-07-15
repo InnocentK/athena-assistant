@@ -21,8 +21,8 @@ from providers.base import Message
 
 from app.models import (
     ChatRequest, ChatResponse,
-   
-   
+
+
     ProfileUpdate,
 )
 
@@ -239,4 +239,3 @@ async def providers() -> list[dict[str, Any]]:
         )
     except asyncio.TimeoutError:
         raise HTTPException(status_code=503, detail="Provider listing timed out.") from None
-

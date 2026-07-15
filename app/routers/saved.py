@@ -215,4 +215,3 @@ async def saved_actions_run(item_id: str) -> dict[str, Any]:
         "model": response.model,
         "success": response.success,
     }
-

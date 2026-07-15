@@ -98,6 +98,18 @@ tasks:
       - "{{.PYTHON}} -m pytest --cov --cov-report=html"
       - echo "Open htmlcov/index.html"
 
+  hooks:install:
+    desc: "Install the git pre-commit hooks (once per clone, M26.26)"
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - "{{.PYTHON}} -m pre_commit install"
+
+  hooks:run:
+    desc: "Run all pre-commit hooks against every file"
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - "{{.PYTHON}} -m pre_commit run --all-files"
+
   ci:
     desc: "Run the full CI gate locally (lint + typecheck + audit + editable install + suite w/ coverage) — same as .github/workflows/ci.yml"
     dir: "{{.ROOT_DIR}}"

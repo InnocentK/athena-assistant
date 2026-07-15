@@ -83,4 +83,3 @@ async def check_dav_integration(integration: str) -> dict[str, Any]:
             detail="Operation timed out after 30s. The server may be busy or the remote service is not responding.",
         ) from None
     return {**result, "status": _get_dav_status().get(integration)}
-

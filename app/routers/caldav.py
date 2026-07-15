@@ -27,8 +27,8 @@ from core.urlguard import ensure_same_origin
 from app.models import (
     ConflictActionRequest,
     IcsImportRequest,
-   
-   
+
+
     TaskCreateRequest,
 )
 
@@ -327,4 +327,3 @@ async def caldav_resolve_conflict(
         )
 
     return result
-

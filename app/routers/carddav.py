@@ -25,8 +25,8 @@ from core.config import APP_ROOT
 
 from app.models import (
     ConflictActionRequest,
-   
-   
+
+
     StageMergeRequest,
     VcfImportRequest,
 )
@@ -491,4 +491,3 @@ async def carddav_resolve_conflict(
         raise HTTPException(status_code=400, detail=f"Unknown action: {action!r}. Use 'skip', 'overwrite', or 'merge_staged'.")
 
     return result
-

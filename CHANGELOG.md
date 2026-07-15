@@ -4,6 +4,38 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [Unreleased] — Milestone 26.26 — pre-commit hooks
+
+Tooling only — **no code change; the app stays at 2.6.25** (the two whitespace/
+final-newline fixes below are cosmetic). Spec: `docs/specs/M26.26-pre-commit.md`.
+Depends on M26.23 (git).
+
+### Added
+- **`.pre-commit-config.yaml`** — fast, deterministic gates that run *before a
+  commit is made*: **ruff** (`ruff-pre-commit` v0.15.11, check-only, matches CI),
+  **mypy** (a `local`/system hook so it uses the project config exactly like
+  `task typecheck`), and stock hygiene hooks (`end-of-file-fixer`,
+  `trailing-whitespace`, `check-yaml`, `check-toml`, `check-merge-conflict`,
+  `check-added-large-files`, `detect-private-key`). The full pytest/vitest
+  suites deliberately stay in CI / `task ci` (too slow per-commit).
+- `pre-commit==4.6.0` (dev dep); `task hooks:install` (one-time) and
+  `task hooks:run` (all files).
+
+### Changed / fixed (hygiene)
+- Ran the hooks across the tree and applied their fixes so the repo is
+  pre-commit-clean from day one: **final newlines** added to the 10
+  `app/routers/*.py` files (an artifact of the M26.18 split's code generation)
+  and **trailing whitespace** trimmed from two archived `docs/history/*.md`
+  files. Behaviour-neutral; gate stays green (ruff + mypy + 438 tests).
+
+### Notes
+- **Activate once per clone:** `pre-commit install` (or `task hooks:install`) —
+  this must be run on a machine with network access (pre-commit fetches the hook
+  repos on first use), so it's a manual step, not baked into this commit.
+- The ruff/mypy versions in `.pre-commit-config.yaml` are kept in **lockstep**
+  with `requirements.txt` — bump them together (INVARIANTS). Emergency bypass:
+  `git commit --no-verify`.
+
 ## [Unreleased] — Milestone 26.24 — Coverage measurement
 
 Test-infra only — **no code change; the app stays at 2.6.25**. Spec:

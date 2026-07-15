@@ -48,6 +48,19 @@ This file is the durable contract; per-release history lives in
   `test_ui_correctness.py`) are kept alongside the runtime tests — they catch
   "someone rewrote the file" cheaply even when no matching JS test exists.
 
+## pre-commit hooks (M26.26)
+
+- **The ruff/mypy versions in `.pre-commit-config.yaml` MUST match the pins in
+  `requirements.txt`.** A mismatch means pre-commit and CI disagree about what's
+  clean. Bump them together (ruff is `v0.15.11` in both; mypy runs as a
+  `local`/system hook so it just uses the installed pin).
+- pre-commit is **lint + types + hygiene only** — the pytest/vitest suites stay
+  in CI / `task ci` (too slow to run on every commit). Don't add them to the
+  pre-commit config.
+- Hooks are a default, not a lock: `git commit --no-verify` bypasses them for
+  emergencies. Activation (`pre-commit install`) is a per-clone manual step (it
+  fetches hook repos over the network).
+
 ## Coverage floor (M26.24)
 
 - **`task coverage` must stay ≥ the `fail_under` floor** (70%, in

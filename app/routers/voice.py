@@ -85,4 +85,3 @@ async def voice_synthesize() -> dict[str, str]:
             "See voice/stubs.py for the piper-tts upgrade path."
         ),
     )
-

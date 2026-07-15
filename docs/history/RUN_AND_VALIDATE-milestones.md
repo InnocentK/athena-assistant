@@ -55,7 +55,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 docker compose up --build
 ```
 
-The API is available at `http://localhost:8000`.  
+The API is available at `http://localhost:8000`.
 Interactive docs: `http://localhost:8000/docs`
 
 ---
@@ -104,7 +104,7 @@ Expected shape (values depend on your environment):
 ]
 ```
 
-`available: true` for `chatgpt` requires `OPENAI_API_KEY` to be set.  
+`available: true` for `chatgpt` requires `OPENAI_API_KEY` to be set.
 `available: true` for CLI adapters requires the respective binary on PATH.
 
 ### Send a chat message

@@ -170,4 +170,3 @@ async def files_write(body: FileWriteRequest) -> dict[str, Any]:
             detail={"path": body.path, "error": str(exc)},
         )
         raise HTTPException(status_code=403, detail=str(exc)) from exc
-
