@@ -34,6 +34,13 @@ Which doc do you want?
 | [specs/README.md](specs/README.md) | Read the approved-but-not-started milestone specs |
 | [../CHANGELOG.md](../CHANGELOG.md) | See per-release history |
 | [global-claude-template.md](global-claude-template.md) | Set up project-agnostic agent norms (`~/.claude/CLAUDE.md`) |
+| [CI.md](CI.md) | Run the lint+type+test gate and activate GitHub CI |
+
+## Version control
+
+The project is a **local git repository** (M26.23). `.gitignore` keeps secrets
+(`.env`), the virtualenv, `node_modules/`, and runtime data (`data/`, logs) out
+of history. There is **no remote yet** — add one to activate CI ([CI.md](CI.md)).
 
 ## Archived
 

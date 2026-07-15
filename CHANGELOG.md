@@ -4,6 +4,27 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [Unreleased] — Milestone 26.23 — Version control (git init)
+
+Foundational, tooling only — **no code change; the app stays at 2.6.21**. Spec:
+`docs/specs/M26.23-git-init.md`.
+
+The project is now a **local git repository** (`git init` + a single initial
+commit of the 2.6.21 tree). Before the first `git add`, the `.gitignore` was
+verified to exclude `.env` (real credentials), the virtualenv, `node_modules/`,
+`*.egg-info/`, and all runtime data (`data/`, logs) — a secret/data sweep of the
+staged set came back empty (164 source/docs/config/test files tracked).
+
+### Notes
+- **No remote yet** — commit history is local; CI ([docs/CI.md](docs/CI.md))
+  stays inert until a GitHub (or other) remote is added and pushed. Committer
+  identity: `Innocent <InnocentK@users.noreply.github.com>` (repo-local, no global git
+  identity was configured); amend the initial commit if you'd prefer different
+  authorship before pushing anywhere.
+- `docs/CI.md` activation steps and the `CLAUDE.md` milestone-loop "package"
+  step updated to reflect that the repo is git-tracked (commits are the record;
+  the zip-exclude list stays for the handoff-zip case).
+
 ## [Unreleased] — Milestone 26.22 — Frontend (jsdom) test harness
 
 Test infrastructure + docs only — **no production code change; the app stays at

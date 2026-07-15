@@ -42,9 +42,13 @@ Every change ships as a narrow milestone following this exact loop:
    any affected doc, and — on a code release — bump **`core/version.py`**
    (the single version source; see below). Add any new "do not break" rule to
    `docs/INVARIANTS.md`.
-6. **Package** — zip `athena-assistant/` excluding `.venv/`, `__pycache__/`,
-   `.git/`, `node_modules/`, `logs/`, `audit/*.log` (keep `audit/` **source**),
-   `data/exports/`, `data/carddav_staged/`, `data/restore_staging/`.
+6. **Commit / package** — the project is **git-tracked** (M26.23; `.gitignore`
+   already excludes `.env`, `.venv/`, `node_modules/`, `data/`, logs, etc.).
+   Commits are the record of change. **Only commit when asked** (the
+   commit-when-asked norm still holds). For a handoff *zip* instead, exclude
+   `.venv/`, `__pycache__/`, `.git/`, `node_modules/`, `logs/`, `audit/*.log`
+   (keep `audit/` **source**), `data/exports/`, `data/carddav_staged/`,
+   `data/restore_staging/`.
 7. **Stop** — report files changed / test result / version; wait for the next
    approval.
 

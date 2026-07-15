@@ -26,15 +26,14 @@ M26.18) → `ruff check .` → `mypy .` → `pytest -q`.
 
 ## Activating it
 
-The project is **not yet under version control**, so the workflow is inert until
-you put it on GitHub:
+The project **is now a local git repository** (M26.23 — `git init` done, first
+commit at 2.6.21). The workflow stays inert only until you add a **GitHub
+remote**:
 
 ```bash
 cd athena-assistant
-git init
-git add -A
-git commit -m "Athena 2.6.19"
-# create an empty repo on GitHub (e.g. via: gh repo create athena-assistant --private --source=. --remote=origin)
+# create an empty repo on GitHub and push (e.g. with the gh CLI):
+gh repo create athena-assistant --private --source=. --remote=origin
 git push -u origin main
 ```
 
