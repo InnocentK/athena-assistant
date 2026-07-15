@@ -48,6 +48,19 @@ This file is the durable contract; per-release history lives in
   `test_ui_correctness.py`) are kept alongside the runtime tests — they catch
   "someone rewrote the file" cheaply even when no matching JS test exists.
 
+## Dependency audit (M26.25)
+
+- **Pinned dependencies must stay CVE-clean.** `task audit` (`pip-audit -r
+  requirements.txt --no-deps`) must report no known vulnerabilities. When it
+  flags a package, assess and bump the pin to the fix version, re-run the full
+  gate (`task ci`), and re-audit → 0. A dependency bump is a code release (bump
+  `core/version.py`). The CI `pip-audit` step is intentionally **non-blocking**
+  so a newly-disclosed upstream CVE doesn't fail unrelated PRs — do not make it
+  blocking without a triage plan.
+- `pip-audit` is pinned for reproducible runs, but its advisory DB updates over
+  time (intended). `--no-deps` scans exactly the pinned set (no hashed
+  lockfile); a future tightening is `pip-compile --generate-hashes`.
+
 ## Type gate (M26.21)
 
 - **`task typecheck` (mypy) must pass.** Config is `[tool.mypy]` in

@@ -79,6 +79,12 @@ tasks:
     cmds:
       - npm run test
 
+  audit:
+    desc: "Scan pinned dependencies for known vulnerabilities (pip-audit, M26.25)"
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - "{{.PYTHON}} -m pip_audit -r requirements.txt --no-deps"
+
   ci:
     desc: "Run the full CI gate locally (lint + typecheck + editable install + suite) — same as .github/workflows/ci.yml"
     dir: "{{.ROOT_DIR}}"

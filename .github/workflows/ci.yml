@@ -43,6 +43,12 @@ jobs:
       - name: Type-check (mypy)
         run: mypy .
 
+      - name: Dependency vulnerability scan (pip-audit)
+        # Non-blocking (M26.25): a newly-disclosed upstream CVE shouldn't red-wall
+        # an unrelated PR overnight. The report is surfaced; triage via `task audit`.
+        continue-on-error: true
+        run: python -m pip_audit -r requirements.txt --no-deps
+
       - name: Test (pytest)
         run: pytest -q
 

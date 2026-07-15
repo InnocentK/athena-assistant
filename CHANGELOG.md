@@ -4,6 +4,32 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [2.6.25] — Milestone 26.25 — Dependency vulnerability scanning + CVE fix
+
+Adds a dependency-audit gate **and remediates a real, measured finding**. Spec:
+`docs/specs/M26.25-pip-audit.md`. (2.6.22–2.6.24 were not released —
+M26.22/26.23/26.24 are infra/docs-only.)
+
+### Security
+- **Fixed 4 known CVEs in `python-multipart`** (`0.0.26 → 0.0.31`):
+  PYSEC-2026-3036/3037 (fixed in 0.0.30), PYSEC-2026-3040 (0.0.31),
+  PYSEC-2026-3039 (0.0.27). `python-multipart` is FastAPI's form-parser; Athena
+  uses it only transitively (no active form/upload path), so the bump is
+  low-risk — the full gate (ruff + mypy + 438 tests) stays green on 0.0.31, and
+  `pip-audit` now reports **no known vulnerabilities**.
+
+### Added
+- **`pip-audit`** as the dependency-vulnerability gate (`pip-audit==2.10.1` in
+  dev deps). `task audit` scans the pinned set (`-r requirements.txt --no-deps`).
+  A CI step runs it **non-blocking** (`continue-on-error`) — a newly-disclosed
+  upstream CVE surfaces in the report without red-walling an unrelated PR;
+  triage locally with `task audit`. Tighten to blocking later if desired.
+
+### Notes
+- Pinned deps (M26.19) go stale silently; this is the watcher. `pip-audit`
+  itself is pinned, but its advisory database updates over time — that's the
+  point. INVARIANTS: pins must stay CVE-clean (`task audit`).
+
 ## [Unreleased] — Milestone 26.23 — Version control (git init)
 
 Foundational, tooling only — **no code change; the app stays at 2.6.21**. Spec:
