@@ -10,4 +10,4 @@ The profile *schema* version (profiles/*/profile.yaml) is intentionally
 separate and does not track releases.
 """
 
-__version__ = "2.6.25"
+__version__ = "2.6.28"

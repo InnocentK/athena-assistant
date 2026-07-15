@@ -4,6 +4,40 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [2.6.28] — Milestone 26.28 — Installable PWA (web UI)
+
+User-visible frontend feature — **app bumped to 2.6.28**. Spec:
+`docs/specs/M26.28-pwa.md`. Makes the browser UI installable (add-to-home-screen,
+standalone display, app icon) so reaching a server instance from a phone over
+Tailscale/VPN feels like an app.
+
+### Added
+- **Web app manifest** (`static/manifest.webmanifest`): `standalone` display,
+  root `start_url`/`scope`, theme/background colors matching the dark UI, and
+  `any` + `maskable` icons.
+- **Icons** under `static/icons/` (192, 512, maskable-512, apple-touch-180).
+- **Service worker** (`static/js/sw.js`) served at **`/sw.js`** (root scope)
+  via a small route that substitutes the running version into the cache name, so
+  each release drops the old shell cache on `activate` (same anti-stale
+  discipline as the M26.1 `?v=` versioning). It caches **only the static shell +
+  root navigation** (runtime caching, allowlist) and **never** dynamic/API
+  responses — Athena is server-dependent, so faking offline answers would be a
+  correctness bug.
+- **Registration** (`static/js/pwa.js`) guarded by `'serviceWorker' in
+  navigator`; template `<head>` gains the manifest link, `theme-color`,
+  apple-touch-icon, and iOS standalone metas.
+
+### Notes
+- **Secure-context dependency (by design):** service workers + install require
+  HTTPS or `localhost`. Over a plain `http://<tailscale-ip>` origin the worker
+  never registers and the page runs as an ordinary tab — no errors. So the PWA
+  only fully lights up once the TLS path (`tailscale serve` / reverse proxy +
+  TLS) from `docs/PLATFORMS.md` is in place: it is polish on the remote-access
+  pattern, not a replacement for it.
+- Tests: `tests/test_pwa.py` (route + manifest + icons, 6) and
+  `tests/js/pwa.test.js` (registration guard, 3). Gate green (ruff + mypy + 444
+  pytest + 17 vitest).
+
 ## [Unreleased] — Milestone 26.27 — platform support & limitations docs
 
 Documentation only — **no code change; the app stays at 2.6.25**. Spec:

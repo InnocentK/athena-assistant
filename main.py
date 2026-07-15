@@ -25,7 +25,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -298,6 +298,27 @@ async def index(request: Request) -> HTMLResponse:
         # asset_version busts the browser cache on every release so JS/CSS
         # changes actually reach users (M26.1).
         {"assistant_name": assistant_name, "asset_version": app.version},
+    )
+
+
+@app.get("/sw.js", include_in_schema=False)
+async def service_worker() -> Response:
+    """
+    Serve the PWA service worker (M26.28) from the site root so its scope is the
+    whole app ("/"). The running version is substituted into the worker's cache
+    name (``__ATHENA_VERSION__``) so each release invalidates the previous shell
+    cache on ``activate`` — the same anti-stale discipline as the ``?v=`` asset
+    versioning (M26.1). ``no-cache`` lets browsers pick up an updated worker.
+
+    The worker itself only registers in a secure context (HTTPS/localhost); over
+    plain HTTP the client-side guard in ``pwa.js`` makes registration a no-op.
+    """
+    source = (APP_ROOT / "static" / "js" / "sw.js").read_text(encoding="utf-8")
+    body = source.replace("__ATHENA_VERSION__", app.version)
+    return Response(
+        content=body,
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache, must-revalidate"},
     )
 
 

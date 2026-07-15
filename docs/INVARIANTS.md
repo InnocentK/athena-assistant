@@ -348,8 +348,17 @@ This file is the durable contract; per-release history lives in
   and `/static` is served by `_RevalidateStaticFiles`
   (`Cache-Control: no-cache, must-revalidate`). Frontend changes rely on this to
   reach upgraded browsers — do not drop the versioned URLs or the header.
+- **PWA service worker caches the shell only, version-scoped (M26.28).** The
+  `/sw.js` route bakes `app.version` into the cache name so a release drops the
+  old cache on `activate` — the SW analogue of the `?v=` rule above; keep them in
+  sync. The `fetch` handler is an **allowlist**: it caches only `/static/*` +
+  root navigation and **never** dynamic/API responses (`/chat`, memory, settings,
+  DAV, backup) — Athena is server-dependent, so caching a turn would be a
+  correctness bug. Registration (`static/js/pwa.js`) stays guarded by
+  `'serviceWorker' in navigator` so plain-HTTP origins degrade to an ordinary
+  page. Do not broaden the cache allowlist or drop the registration guard.
 - Tests: `tests/test_ui_correctness.py` (source-structure guards; no JS runtime
-  in the suite by design).
+  in the suite by design); `tests/test_pwa.py` + `tests/js/pwa.test.js` (M26.28).
 
 ## CLI (M16/M17/M25/M26.6)
 

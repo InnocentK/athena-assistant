@@ -85,8 +85,13 @@ error shows exactly one message and records no assistant turn, an HTTP error
 surfaces the server detail (not a generic network error), empty input is a
 no-op; `appendMessage` is XSS-safe (`textContent`); `buildDiagnosticsSummary`
 formatting; and `voice.js` degrades safely (answers still render when the Web
-Speech APIs are absent). The Python-side source-structure guards
-(`test_chat_status_ui.py`, `test_ui_correctness.py`) are kept as belt-and-braces.
+Speech APIs are absent). `pwa.test.js` (M26.28) covers the service-worker
+**registration guard** — a clean no-op on an insecure context (no
+`navigator.serviceWorker`), and `register("/sw.js")` when the API is present (the
+worker's runtime caching isn't unit-tested — jsdom has no service-worker
+runtime; the `/sw.js` route + manifest are covered by `test_pwa.py`). The
+Python-side source-structure guards (`test_chat_status_ui.py`,
+`test_ui_correctness.py`) are kept as belt-and-braces.
 
 ## What is intentionally not covered yet
 

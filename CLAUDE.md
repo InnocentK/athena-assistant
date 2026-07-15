@@ -151,12 +151,15 @@ frontend test harness). Full per-milestone detail is in `CHANGELOG.md`.
 
 **Specced, awaiting go-ahead (docs mini-milestone + feature epics — specs in `docs/specs/`):**
 
-- **M26.27 — platform support & limitations docs.** Docs-only (no bump): a
+- **M26.27 — platform support & limitations docs.** *Shipped* (no bump): a
   "Running Athena on <platform>" support matrix (Mac tested / Linux expected /
   Windows CLI-adapter caveats / container API-transport-only / mobile via
-  Tailscale-VPN, no native app) + a remote-access pointer. Do first — the
-  out-of-tree LXC installer and the remote-access docs both reference it.
-  → `docs/specs/M26.27-platform-support-docs.md`
+  Tailscale-VPN, no native app) + a remote-access pointer. `docs/PLATFORMS.md`.
+- **M26.28 — installable PWA (web UI).** *Shipped → 2.6.28*: manifest +
+  version-scoped service worker (caches the static shell only, never dynamic/API)
+  + icons; registration guarded so it degrades to an ordinary page off a secure
+  context (HTTPS/localhost). Polish on the remote-access path, not a replacement.
+  → `docs/specs/M26.28-pwa.md`
 - **M27 — Live status & usage telemetry (epic).** Renamed from "Advanced CLI
   live status" (the old title buried cross-surface work). **M27.0** live status
   core (richer CLI status line; stderr; additive, not a TUI) → 2.7.0; **M27.1**

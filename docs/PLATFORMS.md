@@ -27,7 +27,7 @@ Two facts shape every row below:
 | **Linux (desktop / server)** | **Expected good** | Same POSIX assumptions as macOS, and the CI matrix runs the full suite on Linux (Python 3.10 and 3.11), so the Python side is actively exercised on every change. CLI transports work when the vendor CLIs are present. **Recommended server platform.** |
 | **Windows** | **Works with caveats** | The FastAPI backend, the browser UI, and **API transports** are expected to run under a normal CPython install. The weak point is the **CLI provider adapters**: they launch vendor CLIs as subprocesses with POSIX-flavoured assumptions (argument lists, `stdin=DEVNULL`, signal/timeout handling, path and quoting rules) and are **not tested on Windows**. If you want CLI transports on Windows, run Athena under **WSL2**, which behaves like the Linux row. Native-Windows CLI transports are unverified — treat them as unsupported until tested. |
 | **Container (Docker / LXC)** | **Works — API-transport-only by default** | Python + FastAPI run trivially in a stock container. But the **vendor CLIs are not present, and they usually require interactive login**, so a headless container is **API-transport-only** (chatgpt / grok-api / ollama via keys in `.env`) unless the operator deliberately bakes the CLIs *and their authentication* into the image. Plan container deployments around API transports; treat CLI transports as an opt-in you build in yourself. |
-| **Mobile (iOS / Android)** | **No native app — not a run target** | Athena is a server process; there is no mobile build and none is planned. Use Athena *from* a phone by reaching a desktop/server instance **remotely over Tailscale/VPN** and opening the existing browser UI — don't try to run the server *on* the phone. |
+| **Mobile (iOS / Android)** | **No native app — not a run target** | Athena is a server process; there is no mobile build and none is planned. Use Athena *from* a phone by reaching a desktop/server instance **remotely over Tailscale/VPN** and opening the existing browser UI — don't try to run the server *on* the phone. The UI is an **installable PWA** (add-to-home-screen, standalone display), but installability requires a **secure context (HTTPS)** — see the note below. |
 
 ### How to read the levels
 
@@ -60,6 +60,18 @@ Either way, Athena stays bound to a private interface and never to `0.0.0.0` on
 a public bridge. The security trade-offs of exposing a server are the operator's
 to manage, as with any self-hosted application. See [SECURITY.md](SECURITY.md)
 for what Athena does and does not protect.
+
+### PWA install requires HTTPS
+
+The browser UI can be **installed as a PWA** (M26.28) — an app icon, a
+standalone window, faster loads. But service workers and "add to home screen"
+only work in a **secure context**: HTTPS, or `localhost`/`127.0.0.1`. Reaching
+the server by bare `http://<tailscale-ip>:8000` is *not* a secure context, so
+the install option simply won't appear and the page runs as an ordinary tab (no
+error). To get installability over a tailnet, terminate TLS — `tailscale serve`
+(gives an HTTPS tailnet URL) or the reverse-proxy-plus-TLS pattern above. In
+other words, the PWA is polish layered on the same remote-access setup, not a
+way around it.
 
 ## See also
 
