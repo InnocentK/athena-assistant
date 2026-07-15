@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ assistant_name }}</title>
+  <link rel="stylesheet" href="/static/css/chat.css?v={{ asset_version }}">
+</head>
+<body>
+  <div id="app">
+    <header id="header">
+      <span id="assistant-name">{{ assistant_name }}</span>
+      <span id="provider-badge">—</span>
+      <button id="memory-btn" title="Memory">Memory</button>
+      <button id="settings-btn" title="Settings">⚙</button>
+      <button id="history-btn" title="History &amp; Attachments">🕘</button>
+      <span id="status-dot" class="status-ready"></span>
+    </header>
+
+    <div id="memory-panel" class="memory-panel hidden">
+      <div class="memory-panel-header">
+        <span>Memory</span>
+        <button id="memory-close-btn">✕</button>
+      </div>
+      <div class="memory-panel-tabs">
+        <button class="mem-tab active" data-tab="pending">Review queue</button>
+        <button class="mem-tab" data-tab="all">All memories</button>
+      </div>
+      <div id="memory-panel-body"></div>
+    </div>
+
+    <div id="settings-panel" class="settings-panel hidden">
+      <div class="settings-panel-header">
+        <span>Settings</span>
+        <button id="settings-close-btn">✕</button>
+      </div>
+      <div class="settings-panel-tabs">
+        <button class="set-tab active" data-tab="profile">Profile</button>
+        <button class="set-tab" data-tab="providers">Providers</button>
+        <button class="set-tab" data-tab="integrations">Integrations</button>
+      </div>
+      <div id="settings-panel-body"></div>
+    </div>
+
+    <div id="history-panel" class="history-panel hidden">
+      <div class="history-panel-header">
+        <span>History &amp; Attachments</span>
+        <button id="history-close-btn">✕</button>
+      </div>
+      <div class="history-panel-tabs">
+        <button class="hist-tab active" data-tab="conversation">Conversation</button>
+        <button class="hist-tab" data-tab="files">Files</button>
+      </div>
+      <div id="history-panel-body"></div>
+    </div>
+
+    <main id="chat-window">
+      <div id="messages"></div>
+    </main>
+    <div id="chat-status" class="chat-status hidden">
+      <span class="chat-status-text">Working…</span>
+      <span class="progress-bar" aria-hidden="true"><span class="progress-bar-fill"></span></span>
+    </div>
+    <footer id="input-area">
+      <textarea id="message-input" placeholder="Message {{ assistant_name }}..." rows="1"></textarea>
+      <button id="send-btn">Send</button>
+      <button id="ptt-btn" title="Hold to talk (or click to toggle)" disabled>🎤</button>
+    </footer>
+  </div>
+  <script src="/static/js/voice.js?v={{ asset_version }}"></script>
+  <script src="/static/js/chat.js?v={{ asset_version }}"></script>
+</body>
+</html>

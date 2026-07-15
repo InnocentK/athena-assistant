@@ -1,0 +1,56 @@
+# .dockerignore — exclude from Docker build context
+
+# Virtual environment — never copy into image (image builds its own from requirements.txt)
+.venv/
+venv/
+env/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Secrets — never bake into image
+.env
+
+# Runtime data — managed via volumes, not baked in
+# (audit/ holds source too, so exclude only its runtime logs)
+logs/
+audit/*.log
+data/
+
+# Version control
+.git/
+.gitignore
+
+# Editor artifacts
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Previous milestone zip files
+athena-assistant-milestone*.zip
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Frontend (jsdom) test toolchain — dev/CI only, never in the runtime image (M26.22)
+node_modules/
+package.json
+package-lock.json
+vitest.config.js
+tests/
+
+# CI config — not needed in image
+.github/
+
+# Docs and scripts not needed in image
+*.md
+docs/

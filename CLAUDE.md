@@ -1,0 +1,177 @@
+# CLAUDE.md — Athena Assistant (agent handoff)
+
+Read this before touching any code. This is the durable operating guide; it is
+deliberately kept small. Volatile detail lives elsewhere:
+
+- **Release history / what each milestone did** → [`CHANGELOG.md`](CHANGELOG.md)
+- **"Do not break these" mechanisms & safety invariants** → [`docs/INVARIANTS.md`](docs/INVARIANTS.md)
+- **Architecture & design** → [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- **All docs index** → [`docs/README.md`](docs/README.md)
+
+> This file is canonical. `AGENTS.md` points here for tools that look for it.
+> A copy of the parent-dir handoff is a pointer stub — edit *this* file.
+
+---
+
+## Project overview
+
+Athena is a **local-first AI assistant**: Python 3.10+ / FastAPI, a dark-theme
+browser chat UI, and a one-shot CLI (`athena "..."` / `python -m cli "..."`).
+All config, memory, and profile data are plain local YAML files — no cloud
+database, no auth layer. Designed to run in Docker on modest hardware.
+
+**Status:** run `task test:run` for the live test count; `/health` reports the
+running version. The roadmap (below) tracks what's shipped vs open. Do not
+hardcode the version or test count into prose — they drift.
+
+## How milestone work is done (the loop — maintain it)
+
+Every change ships as a narrow milestone following this exact loop:
+
+1. **Plan/spec → explicit approval.** Never write code before the plan is
+   approved. Do not start a milestone until asked.
+2. **Read** all files you plan to touch before writing anything.
+3. **Implement** in the narrowest set of files. Reuse existing
+   architecture/patterns; no scope creep.
+4. **Gate: lint + types + tests** — `task ci` must pass (`ruff check` +
+   `mypy .` + editable install + `pytest`), or run them individually
+   (`task lint`, `task typecheck`, `task test:run`). All prior tests must still
+   pass; add a targeted, fully-mocked regression test for the change (no real
+   CLIs/keys/network in the suite).
+5. **Docs** — update `CHANGELOG.md`, `docs/TESTING.md` (if tests were added),
+   any affected doc, and — on a code release — bump **`core/version.py`**
+   (the single version source; see below). Add any new "do not break" rule to
+   `docs/INVARIANTS.md`.
+6. **Package** — zip `athena-assistant/` excluding `.venv/`, `__pycache__/`,
+   `.git/`, `node_modules/`, `logs/`, `audit/*.log` (keep `audit/` **source**),
+   `data/exports/`, `data/carddav_staged/`, `data/restore_staging/`.
+7. **Stop** — report files changed / test result / version; wait for the next
+   approval.
+
+**Version:** bump `core/version.py` (`__version__`) — the ONLY bump site
+(M26.17). `main.py`, `pyproject.toml` (dynamic), and the health test all read
+it. Details in `docs/INVARIANTS.md`.
+
+## Guardrails
+
+- **Read `docs/INVARIANTS.md` before editing a subsystem** — it lists the
+  mechanisms that must not be reverted (concurrency wrapping, write-safety
+  guards, provider bounding, ICS formatting, UI correctness, CLI logging, etc.),
+  each with its enforcing test.
+- Add targeted mocked tests; keep the suite green.
+- Do not introduce heavyweight dependencies without a good reason.
+- Flag-bearing CLI features don't fit the repo's named-var Taskfile convention —
+  skip a Taskfile task for those.
+- Guiding principle (from live testing): some latency is normal for CLI-backed
+  providers. **Measure first, then UX feedback, then optimize only if the data
+  shows a problem** — this is why diagnostics (M22) precede the UI/CLI status
+  work (M24/M25).
+
+## Files to read first
+
+| File | Why |
+|---|---|
+| `main.py` | App assembly + state: lifespan, `_require_*`, shared helpers, `GET /`, router includes |
+| `app/routers/<domain>.py` | The actual route handlers (edit these to change an endpoint); reach state via `main.` — see INVARIANTS "router split" |
+| `app/models.py` | Pydantic request/response models |
+| `core/config.py` | `APP_ROOT`, Settings, path helpers — used everywhere |
+| `providers/router.py` | `ProviderRouter.route()` — core orchestration |
+| `providers/base.py` + `providers/ollama.py` / `providers/claude.py` | Adapter contract + API and CLI patterns |
+| `memory/manager.py` | YAML-backed memory + pending review queue |
+| `profiles/athena/profile.yaml` | Active profile structure |
+| `tests/conftest.py` | Test fixtures — read before writing tests |
+| `docs/INVARIANTS.md` | The "do not break these" contract |
+| `docs/ARCHITECTURE.md` | Component map & design decisions |
+| `Taskfile.yml` | All project commands (`task --list`) |
+
+## App structure (map)
+
+```
+main.py                     FastAPI app assembly + state layer (lifespan,
+                            _require_*, shared helpers, GET /; includes routers)
+app/models.py               Pydantic request/response models (M26.18)
+app/routers/<domain>.py     one APIRouter per domain (M26.18) — handlers reach
+                            main state via `main.` after `import main`
+core/{config,loader,logger} APP_ROOT/Settings, YAML I/O, logging
+core/version.py             __version__ — the single bump site
+core/urlguard.py            DAV same-origin guard (M26.13)
+providers/                  router.py + adapters (claude/gemini/chatgpt/grok/ollama/hermes/chatgpt_cli)
+cli/                        one-shot CLI (main.py, status.py) — python -m cli / athena
+memory/ · saved/ · files/   YAML memory + saved items + allowlisted file access
+caldav_integration/ · carddav_integration/ · nextcloud_integration/   NETWORK clients
+dav_io/                     LOCAL ICS/VCF parse/format/conflicts (no network)
+dav_status/store.py         in-memory DAV health ledger (thread-safe singleton)
+diagnostics/store.py        provider latency ledger (measure-only, M22)
+backup/manager.py           export zip+manifest, diff, staged restore
+audit/ops_audit.py          JSON-lines ops audit
+config/ · profiles/         YAML config + active profile (memory subdirs)
+templates/ · static/        Jinja2 chat UI + CSS/JS
+tests/                      pytest suite (run `task test:run`)
+docs/                       see docs/README.md for the index
+```
+
+Naming convention inside single-module packages: `manager.py` = stateful CRUD
+over local files, `store.py` = in-memory ledger/singleton, `client.py` =
+network integration. Each package's `__init__.py` says what it owns, what it
+does *not*, and where its tests live — read it first. Data/code look-alikes:
+`saved/` is code, `profiles/<name>/saved/` is that profile's data; `config/`
+is user-editable YAML, `core/config.py` is the loader. This map and the tree
+in `docs/ARCHITECTURE.md` mirror each other — update both together.
+
+## Roadmap
+
+**Shipped:** M0–M26 (core through editable settings) + the post-2.6.0 fix series
+M26.1–M26.4 + the post-review fix series M26.5–M26.10 (concurrency, CLI logging,
+write-safety, provider robustness, calendar/DAV correctness, web UI correctness)
++ M26.11 (docs & handoff consolidation) + M26.12–M26.18 (DAV timeouts, DAV SSRF
+guard, file-read robustness, Nextcloud/XML correctness, thread-safety, docs &
+single-`__version__` + SessionStart hook, `main.py` router split) + the tooling
+batch M26.19–M26.22 (ruff lint + pinned deps, CI gate, mypy type gate, jsdom
+frontend test harness). Full per-milestone detail is in `CHANGELOG.md`.
+
+**Quality gates now in place** (run all via `task ci` + `task test:js`): ruff
+(`task lint`), mypy (`task typecheck`), pytest (`task test:run`), vitest jsdom
+(`task test:js`). The SessionStart hook reports lint+types+suite at session start.
+
+**Specced, awaiting go-ahead — the foundations batch (specs in `docs/specs/`):**
+
+- **M26.23 — git init + first commit.** The project isn't under version control
+  yet; this is foundational (unblocks CI + pre-commit). Needs your input on
+  identity/remote. → `docs/specs/M26.23-git-init.md`
+- **M26.24 — coverage measurement.** `pytest-cov` + a `fail_under` floor.
+  → `docs/specs/M26.24-coverage.md`
+- **M26.25 — dependency vuln scan + fix.** `pip-audit`; remediates a measured
+  finding (4 CVEs in `python-multipart` 0.0.26 → 0.0.31). → `docs/specs/M26.25-pip-audit.md`
+- **M26.26 — pre-commit hooks.** ruff+mypy+hygiene at commit time; **needs
+  M26.23 first.** → `docs/specs/M26.26-pre-commit.md`
+
+**Open feature work — do not start without an approved spec:**
+
+- **M27 — Advanced CLI live status / status-bar improvements.** A richer live
+  CLI status line (current provider/model, elapsed time, lightweight metadata),
+  inspired by tools like Hermes. Additive only; not a TUI rewrite. Sole
+  remaining roadmap item.
+
+Historical specs for shipped milestones are archived in `docs/specs/` (they
+record the scope + measured counts + self-review for M26.19–M26.22).
+
+**Later / unscheduled:** true per-provider streaming (SSE/WebSocket); CLI REPL;
+persistent cross-session history; real file uploads; Ollama phase 2 (multi-model,
+embeddings, tools); generic OpenAI-compatible local-provider abstraction;
+saved-items surfacing (`athena saved …`) + non-file saved-search targets;
+web-search backend; a shared chat-turn helper. (The JS/UI test harness is now
+scheduled as M26.22.)
+
+## Suggested first actions
+
+0. A **SessionStart hook** (`.claude/settings.json` →
+   `scripts/session-start-check.sh`) already ran when this session opened and
+   printed the baseline: deps status + the suite result (~30s when green,
+   fail-fast when red). **If it reported failures, they are pre-existing —
+   record them before changing anything.** If you don't see its output (other
+   tooling, hooks disabled), do step 1 manually.
+1. `source .venv/bin/activate && task test:run` — confirm the suite is green
+   before changing anything.
+2. Skim `docs/INVARIANTS.md` for the subsystem you're about to touch.
+3. Do not write milestone code until its plan/spec is explicitly approved.
+   Packaging + the `athena` command already exist (M17) — don't re-add them.

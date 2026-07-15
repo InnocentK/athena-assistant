@@ -1,0 +1,14 @@
+{
+  "name": "athena-web-tests",
+  "private": true,
+  "type": "module",
+  "description": "Frontend (jsdom) tests for static/js/*.js — dev/CI only; NOT a runtime dependency of the Python app (M26.22).",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.1",
+    "vitest": "^2.1.8"
+  }
+}

@@ -1,0 +1,7 @@
+# config/caldav.yaml — CalDAV integration settings
+# Credentials go in .env — NOT here.
+# CALDAV_URL, CALDAV_USERNAME, CALDAV_PASSWORD
+
+enabled: false           # Set to true after configuring .env
+default_days_ahead: 30   # How many days ahead to fetch events
+task_calendars: []       # Optional: list of calendar URLs to treat as task lists

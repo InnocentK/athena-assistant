@@ -1,0 +1,1377 @@
+/**
+ * chat.js — Athena Assistant browser chat UI
+ *
+ * Vanilla JS, no frameworks. Works in Firefox, Chrome, and Safari.
+ * All API calls use fetch(). Message content uses textContent (no XSS).
+ *
+ * Milestone 3 — conversation history is maintained in memory only.
+ * History is cleared on page refresh.
+ *
+ * Milestone 4 — memory sidebar panel added (review queue and all memories).
+ *
+ * Milestone 5 — push-to-talk voice integration via voice.js (loaded before
+ * this file). Wires the #ptt-btn button to VoiceController and adds TTS
+ * playback of assistant responses via SpeechSynthesis.
+ */
+
+/* ---------------------------------------------------------
+   State
+   --------------------------------------------------------- */
+let conversationHistory = []; // [{role, content}, ...]
+let assistantName = "Athena";
+let isThinking = false;
+
+// M26.10: per-panel monotonic load token. Each async panel loader captures the
+// current value after clearing its body; if a newer load (e.g. a fast tab
+// switch) bumps the token before the fetch resolves, the stale loader bails
+// instead of appending its results beneath the newer tab's content.
+const _panelLoadToken = { memory: 0, settings: 0, history: 0 };
+
+
+/* ---------------------------------------------------------
+   DOM references (populated after DOMContentLoaded)
+   --------------------------------------------------------- */
+let messagesEl;
+let chatWindow;
+let messageInput;
+let sendBtn;
+let statusDot;
+let providerBadge;
+
+
+/* ---------------------------------------------------------
+   Initialisation
+   --------------------------------------------------------- */
+document.addEventListener("DOMContentLoaded", () => {
+  messagesEl   = document.getElementById("messages");
+  chatWindow   = document.getElementById("chat-window");
+  messageInput = document.getElementById("message-input");
+  sendBtn      = document.getElementById("send-btn");
+  statusDot    = document.getElementById("status-dot");
+  providerBadge = document.getElementById("provider-badge");
+
+  // Voice setup. Guarded with `typeof` so a failed/absent voice.js can't throw
+  // a ReferenceError and abort the whole init handler (M26.10).
+  if (typeof voice !== "undefined" && voice.isSupported) {
+    var pttBtn = document.getElementById('ptt-btn');
+    pttBtn.disabled = false;
+    pttBtn.title = 'Click to start voice input';
+
+    voice.onTranscript = function(text) {
+      messageInput.value = text;
+      autoResizeTextarea();
+      sendMessage();
+    };
+
+    voice.onError = function(msg) {
+      appendMessage('error', msg, null, null);
+      setStatusDot('error');
+    };
+
+    voice.onListeningStart = function() {
+      pttBtn.classList.add('listening');
+      pttBtn.title = 'Listening... click to stop';
+      setStatusDot('thinking');
+    };
+
+    voice.onListeningStop = function() {
+      pttBtn.classList.remove('listening');
+      pttBtn.title = 'Click to start voice input';
+      setStatusDot('ready');
+    };
+
+    pttBtn.addEventListener('click', function() {
+      if (voice.isListening) {
+        voice.stopListening();
+      } else {
+        voice.startListening();
+      }
+    });
+  } else {
+    // Browser doesn't support Web Speech API — leave button disabled with tooltip
+    var pttBtn = document.getElementById('ptt-btn');
+    pttBtn.title = 'Voice input not supported in this browser. Try Chrome or Edge.';
+  }
+
+  // Wire events
+  sendBtn.addEventListener("click", sendMessage);
+  messageInput.addEventListener("keydown", handleInputKeydown);
+  messageInput.addEventListener("input", autoResizeTextarea);
+
+  // Wire memory panel events
+  document.getElementById("memory-btn").addEventListener("click", openMemoryPanel);
+  document.getElementById("memory-close-btn").addEventListener("click", closeMemoryPanel);
+  document.querySelectorAll(".mem-tab").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      switchMemoryTab(btn.dataset.tab);
+    });
+  });
+
+  // Wire settings panel events (Milestone 19)
+  document.getElementById("settings-btn").addEventListener("click", openSettingsPanel);
+  document.getElementById("settings-close-btn").addEventListener("click", closeSettingsPanel);
+  document.querySelectorAll(".set-tab").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      switchSettingsTab(btn.dataset.tab);
+    });
+  });
+
+  // Wire history & attachments panel events (Milestone 20)
+  document.getElementById("history-btn").addEventListener("click", openHistoryPanel);
+  document.getElementById("history-close-btn").addEventListener("click", closeHistoryPanel);
+  document.querySelectorAll(".hist-tab").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      switchHistoryTab(btn.dataset.tab);
+    });
+  });
+
+  // Load profile and providers, then show welcome
+  loadProfile()
+    .then(function () { return loadProviders(); })
+    .then(function () {
+      appendMessage(
+        "assistant",
+        "Hello. I'm " + assistantName + ". How can I help?",
+        null,
+        null,
+        /* isWelcome */ true
+      );
+      messageInput.focus();
+    });
+});
+
+
+/* ---------------------------------------------------------
+   Profile & provider loading
+   --------------------------------------------------------- */
+// Startup provider chip reflects this (M26.1); null → neutral/blank.
+let _preferredProvider = null;
+
+async function loadProfile() {
+  try {
+    const res = await fetch("/profile");
+    if (!res.ok) return; // fallback stays "Athena"
+    const data = await res.json();
+    if (data && data.name) {
+      assistantName = data.name;
+    }
+    if (data && data.routing) {
+      _preferredProvider = data.routing.preferred_provider || null;
+    }
+  } catch (_) {
+    // Network failure — keep default name
+  }
+}
+
+async function loadProviders() {
+  // Startup chip (M26.1): show the configured preferred provider if set;
+  // otherwise stay neutral/blank until a request actually selects a provider.
+  // (Previously this showed the first available provider, which was misleading.)
+  updateProviderBadge(_preferredProvider || null);
+}
+
+
+/* ---------------------------------------------------------
+   Send message
+   --------------------------------------------------------- */
+async function sendMessage() {
+  if (isThinking) return;
+
+  const text = messageInput.value.trim();
+  if (!text) return;
+
+  // Enter thinking state
+  isThinking = true;
+  setInputEnabled(false);
+  setStatusDot("thinking");
+  setChatStatus("Working…");
+  clearTextarea();
+
+  // Show user message immediately
+  appendMessage("user", text, null, null);
+
+  // Build history slice to send (all turns BEFORE this new user message)
+  // The backend appends `message` as the final user turn itself.
+  const historyToSend = conversationHistory.slice(); // copy before pushing
+
+  // Record user turn in local history
+  conversationHistory.push({ role: "user", content: text });
+
+  try {
+    // --- Network phase: this try/catch guards ONLY the fetch + JSON parse.
+    // A rendering/TTS error later must NOT be reported as a network error (M26.10).
+    let res;
+    try {
+      res = await fetch("/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, history: historyToSend }),
+      });
+    } catch (_) {
+      appendMessage("error", "Network error — could not reach the assistant.", null, null);
+      setStatusDot("error");
+      return; // finally still resets input state
+    }
+
+    if (!res.ok) {
+      // HTTP error (4xx / 5xx)
+      let detail = "Request failed (" + res.status + ").";
+      try {
+        const errBody = await res.json();
+        if (errBody && errBody.detail) detail = errBody.detail;
+      } catch (_) {}
+      appendMessage("error", detail, null, null);
+      setStatusDot("error");
+      return;
+    }
+
+    let data;
+    try {
+      data = await res.json();
+    } catch (_) {
+      appendMessage("error", "Received a malformed response from the assistant.", null, null);
+      setStatusDot("error");
+      return;
+    }
+
+    // --- Render phase (network already succeeded). ---
+    if (data.success === false) {
+      // Provider returned a failure response — show as error style, but do NOT
+      // record it as an assistant turn (M26.10): otherwise "All providers
+      // failed." would be replayed to providers on every later message.
+      appendMessage("error", data.response, data.provider, data.model);
+      setStatusDot("error");
+    } else {
+      conversationHistory.push({ role: "assistant", content: data.response });
+      appendMessage("assistant", data.response, data.provider, data.model);
+      setStatusDot("ready");
+      if (data.provider) {
+        updateProviderBadge(data.provider);
+      }
+      // Speak the response if TTS is available. Guarded so a missing voice.js
+      // (or a speak() error) can't break the answer that already rendered.
+      if (typeof voice !== "undefined" && voice.isTTSSupported) {
+        try {
+          voice.speak(data.response);
+        } catch (_) {}
+      }
+    }
+
+    // M24/M24.5: diagnostics under the answer (summary + timeline + details)
+    appendDiagnostics(data.diagnostics);
+  } finally {
+    // Re-enable input regardless of outcome
+    isThinking = false;
+    setInputEnabled(true);
+    setChatStatus("");
+    messageInput.focus();
+  }
+}
+
+
+/* ---------------------------------------------------------
+   Status / progress (Milestone 24) + diagnostics view (M24.5)
+   All rendered from ChatResponse.diagnostics — the content-free
+   M22 trace. No backend/transport changes; reconstructed at
+   completion (no streaming/polling).
+   --------------------------------------------------------- */
+function setChatStatus(text) {
+  // Toggles the in-flight indicator. The indeterminate progress bar lives
+  // inside #chat-status and animates via CSS while the element is visible;
+  // we only touch the text span so the bar markup is preserved.
+  const el = document.getElementById("chat-status");
+  if (!el) return;
+  const textEl = el.querySelector(".chat-status-text");
+  if (text) {
+    if (textEl) textEl.textContent = text;
+    el.classList.remove("hidden");
+  } else {
+    el.classList.add("hidden");
+  }
+}
+
+/**
+ * Render the diagnostics block under an answer: a concise summary line, a
+ * compact proportional provider timeline, and a collapsed details disclosure.
+ * Quiet by default — supporting UI, not the dominant element.
+ */
+function appendDiagnostics(diag) {
+  const summary = buildDiagnosticsSummary(diag);
+  if (!summary && !diag) return;
+
+  const box = document.createElement("div");
+  box.className = "message-diagnostics";
+
+  if (summary) {
+    const s = document.createElement("div");
+    s.className = "message-summary";
+    s.textContent = summary; // textContent — no XSS
+    box.appendChild(s);
+  }
+  const timeline = buildTimeline(diag);
+  if (timeline) box.appendChild(timeline);
+  const details = buildDetails(diag);
+  if (details) box.appendChild(details);
+
+  if (box.childNodes.length) {
+    messagesEl.appendChild(box);
+    scrollToBottom();
+  }
+}
+
+function diagOutcomeClass(outcome) {
+  if (outcome === "ok") return "ok";
+  if (outcome === "skipped" || outcome === "unavailable") return "skip";
+  return "fail"; // failure | exception | anything unexpected
+}
+
+function diagMs(v) {
+  return typeof v === "number" && v > 0 ? Math.round(v) + "ms" : "—";
+}
+
+/**
+ * Compact, proportional, outcome-coloured timeline — one segment per attempt,
+ * width ~ duration_ms / total. Labels truncate; full info is in the title
+ * tooltip so narrow segments stay readable without visual noise.
+ */
+function buildTimeline(diag) {
+  if (!diag || !Array.isArray(diag.records) || !diag.records.length) return null;
+
+  const total =
+    typeof diag.total_ms === "number" && diag.total_ms > 0 ? diag.total_ms : 0;
+  const sumDur = diag.records.reduce(function (a, r) {
+    return a + (typeof r.duration_ms === "number" ? r.duration_ms : 0);
+  }, 0);
+  const denom = total || sumDur || 1;
+
+  const row = document.createElement("div");
+  row.className = "diag-timeline";
+  row.setAttribute("role", "img");
+  row.setAttribute("aria-label", "Provider attempt timeline");
+
+  diag.records.forEach(function (r) {
+    const outcome = r.outcome || "ok";
+    const seg = document.createElement("span");
+    seg.className = "diag-seg diag-seg--" + diagOutcomeClass(outcome);
+    if (diag.selected && r.provider === diag.selected) {
+      seg.classList.add("diag-seg--selected");
+    }
+    const dur = typeof r.duration_ms === "number" ? r.duration_ms : 0;
+    seg.style.flexGrow = String(Math.max(1, Math.round((dur / denom) * 100)));
+
+    const label = (r.provider || "?") + (r.transport ? "/" + r.transport : "");
+    seg.title = label + " — " + outcome + (dur ? " · " + (dur / 1000).toFixed(1) + "s" : "");
+
+    const lab = document.createElement("span");
+    lab.className = "diag-seg-label";
+    lab.textContent = label; // truncates via CSS; full text in title
+    seg.appendChild(lab);
+    row.appendChild(seg);
+  });
+  return row;
+}
+
+/**
+ * Collapsed "Details" disclosure over the full RequestTrace: request meta plus
+ * a per-attempt table (timings + outcome + short error_kind — no message content).
+ */
+function buildDetails(diag) {
+  if (!diag) return null;
+  const records = Array.isArray(diag.records) ? diag.records : [];
+
+  const det = document.createElement("details");
+  det.className = "diag-details";
+  const sum = document.createElement("summary");
+  sum.textContent = "Details";
+  det.appendChild(sum);
+
+  const bits = [];
+  if (diag.mode) bits.push("mode " + diag.mode);
+  if (typeof diag.total_ms === "number") bits.push("total " + (diag.total_ms / 1000).toFixed(1) + "s");
+  if (Array.isArray(diag.attempt_order) && diag.attempt_order.length) {
+    bits.push("order " + diag.attempt_order.join(" → "));
+  }
+  if (diag.request_id) bits.push("id " + diag.request_id);
+  if (bits.length) {
+    const meta = document.createElement("div");
+    meta.className = "diag-meta";
+    meta.textContent = bits.join("  ·  ");
+    det.appendChild(meta);
+  }
+
+  if (records.length) {
+    const table = document.createElement("table");
+    table.className = "diag-table";
+    const head = document.createElement("tr");
+    ["provider", "transport", "outcome", "avail", "call", "total", "note"].forEach(function (h) {
+      const th = document.createElement("th");
+      th.textContent = h;
+      head.appendChild(th);
+    });
+    table.appendChild(head);
+    records.forEach(function (r) {
+      const tr = document.createElement("tr");
+      const selected = diag.selected && r.provider === diag.selected;
+      const cells = [
+        (r.provider || "") + (selected ? " ✓" : ""),
+        r.transport || "",
+        r.outcome || "",
+        diagMs(r.availability_ms),
+        diagMs(r.call_ms),
+        diagMs(r.duration_ms),
+        r.error_kind || r.error || "",
+      ];
+      cells.forEach(function (c) {
+        const td = document.createElement("td");
+        td.textContent = c; // textContent — no XSS
+        tr.appendChild(td);
+      });
+      table.appendChild(tr);
+    });
+    det.appendChild(table);
+  }
+  return det;
+}
+
+/**
+ * Build a concise, low-noise one-line summary from the M22 diagnostics trace.
+ * Examples:
+ *   "Answered via grok/api in 0.8s."
+ *   "claude/cli unavailable; answered via grok/api in 0.8s."
+ *   "No provider answered."
+ */
+function buildDiagnosticsSummary(diag) {
+  if (!diag || !Array.isArray(diag.records)) return "";
+  function label(r) {
+    return r.provider + (r.transport ? "/" + r.transport : "");
+  }
+  const sel = diag.selected;
+  if (!sel) return "No provider answered.";
+  const totalS =
+    typeof diag.total_ms === "number" ? (diag.total_ms / 1000).toFixed(1) + "s" : "";
+  const selRec = diag.records.find(function (r) { return r.provider === sel; });
+  const selLabel = selRec ? label(selRec) : sel;
+  const priors = diag.records
+    .filter(function (r) { return r.provider !== sel && r.outcome !== "ok"; })
+    .map(function (r) { return label(r) + " " + r.outcome; });
+  const core = "answered via " + selLabel + (totalS ? " in " + totalS : "") + ".";
+  if (priors.length) {
+    return priors.join("; ") + "; " + core;
+  }
+  return core.charAt(0).toUpperCase() + core.slice(1);
+}
+
+
+/* ---------------------------------------------------------
+   Append a message bubble to the chat window
+   --------------------------------------------------------- */
+/**
+ * @param {'user'|'assistant'|'error'} role
+ * @param {string} content
+ * @param {string|null} provider  — shown in .meta for assistant messages
+ * @param {string|null} model     — shown in .meta alongside provider
+ * @param {boolean} [isWelcome]   — omit timestamp and provider label
+ */
+function appendMessage(role, content, provider, model, isWelcome) {
+  // Wrapper div
+  const wrapper = document.createElement("div");
+  wrapper.className = "message-wrapper message-" + role;
+
+  // Bubble
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  if (role === "error") {
+    bubble.classList.add("bubble-error");
+  }
+  bubble.textContent = content; // textContent — no XSS
+  wrapper.appendChild(bubble);
+
+  // Meta line (assistant and error messages only, skip for welcome)
+  if (!isWelcome && (role === "assistant" || role === "error")) {
+    const meta = document.createElement("div");
+    meta.className = "meta";
+
+    if (provider) {
+      const providerSpan = document.createElement("span");
+      providerSpan.className = "provider-label";
+      providerSpan.textContent = provider + (model ? " / " + model : "");
+      meta.appendChild(providerSpan);
+    }
+
+    const timeSpan = document.createElement("span");
+    timeSpan.className = "timestamp";
+    timeSpan.textContent = new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    meta.appendChild(timeSpan);
+
+    wrapper.appendChild(meta);
+  }
+
+  // User messages: add just a timestamp
+  if (!isWelcome && role === "user") {
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    const timeSpan = document.createElement("span");
+    timeSpan.className = "timestamp";
+    timeSpan.textContent = new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    meta.appendChild(timeSpan);
+    wrapper.appendChild(meta);
+  }
+
+  messagesEl.appendChild(wrapper);
+  scrollToBottom();
+}
+
+
+/* ---------------------------------------------------------
+   Scroll chat window to bottom
+   --------------------------------------------------------- */
+function scrollToBottom() {
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+}
+
+
+/* ---------------------------------------------------------
+   Provider badge
+   --------------------------------------------------------- */
+function updateProviderBadge(providerName) {
+  if (providerName) {
+    providerBadge.textContent = providerName;
+    providerBadge.classList.remove("no-provider");
+    providerBadge.classList.remove("hidden");
+  } else {
+    // Neutral: blank/hidden until a request actually selects a provider (M26.1).
+    providerBadge.textContent = "";
+    providerBadge.classList.remove("no-provider");
+    providerBadge.classList.add("hidden");
+  }
+}
+
+
+/* ---------------------------------------------------------
+   Status dot
+   --------------------------------------------------------- */
+function setStatusDot(state) {
+  // state: 'ready' | 'thinking' | 'error'
+  statusDot.className = "status-" + state;
+}
+
+
+/* ---------------------------------------------------------
+   Input helpers
+   --------------------------------------------------------- */
+function setInputEnabled(enabled) {
+  messageInput.disabled = !enabled;
+  sendBtn.disabled = !enabled;
+}
+
+function clearTextarea() {
+  messageInput.value = "";
+  messageInput.style.height = "auto";
+}
+
+function handleInputKeydown(e) {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function autoResizeTextarea() {
+  // Reset to auto so shrinking works, then grow to fit content
+  messageInput.style.height = "auto";
+  const maxHeight = 120; // px — matches CSS max-height
+  messageInput.style.height = Math.min(messageInput.scrollHeight, maxHeight) + "px";
+}
+
+
+/* ---------------------------------------------------------
+   Memory sidebar — state
+   --------------------------------------------------------- */
+let _activeMemoryTab = "pending";
+
+
+/* ---------------------------------------------------------
+   Memory sidebar — open / close / switch
+   --------------------------------------------------------- */
+function openMemoryPanel() {
+  document.getElementById("settings-panel").classList.add("hidden"); // one panel at a time
+  document.getElementById("history-panel").classList.add("hidden");
+  document.getElementById("memory-panel").classList.remove("hidden");
+  loadMemoryTab(_activeMemoryTab);
+}
+
+function closeMemoryPanel() {
+  document.getElementById("memory-panel").classList.add("hidden");
+}
+
+function switchMemoryTab(tab) {
+  _activeMemoryTab = tab;
+  document.querySelectorAll(".mem-tab").forEach(function (btn) {
+    if (btn.dataset.tab === tab) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+  loadMemoryTab(tab);
+}
+
+function loadMemoryTab(tab) {
+  if (tab === "pending") {
+    loadPendingMemories();
+  } else {
+    loadAllMemories();
+  }
+}
+
+
+/* ---------------------------------------------------------
+   Memory sidebar — data loading
+   --------------------------------------------------------- */
+async function loadPendingMemories() {
+  const body = document.getElementById("memory-panel-body");
+  const token = ++_panelLoadToken.memory;
+  body.textContent = "";
+
+  try {
+    const res = await fetch("/memory/pending");
+    if (token !== _panelLoadToken.memory) return; // superseded by a newer load
+    if (!res.ok) {
+      const errNode = document.createTextNode("Failed to load pending memories.");
+      body.appendChild(errNode);
+      return;
+    }
+    const entries = await res.json();
+    if (token !== _panelLoadToken.memory) return;
+
+    if (!Array.isArray(entries) || entries.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "memory-empty";
+      empty.textContent = "No entries.";
+      body.appendChild(empty);
+      return;
+    }
+
+    entries.forEach(function (entry) {
+      const card = renderMemoryEntry(entry, [
+        {
+          label: "Approve",
+          className: "mem-btn-approve",
+          onClick: function () { approveMemory(entry.id); },
+        },
+        {
+          label: "Discard",
+          className: "mem-btn-discard",
+          onClick: function () { discardMemory(entry.id); },
+        },
+      ]);
+      body.appendChild(card);
+    });
+  } catch (_) {
+    const errNode = document.createTextNode("Network error loading pending memories.");
+    body.appendChild(errNode);
+  }
+}
+
+async function loadAllMemories() {
+  const body = document.getElementById("memory-panel-body");
+  const token = ++_panelLoadToken.memory;
+  body.textContent = "";
+
+  try {
+    const res = await fetch("/memory");
+    if (token !== _panelLoadToken.memory) return; // superseded by a newer load
+    if (!res.ok) {
+      const errNode = document.createTextNode("Failed to load memories.");
+      body.appendChild(errNode);
+      return;
+    }
+    const data = await res.json();
+    if (token !== _panelLoadToken.memory) return;
+
+    const categories = Object.keys(data);
+    let totalEntries = 0;
+
+    categories.forEach(function (category) {
+      const entries = data[category];
+      if (!Array.isArray(entries) || entries.length === 0) return;
+
+      totalEntries += entries.length;
+
+      const heading = document.createElement("p");
+      heading.className = "memory-category-heading";
+      heading.textContent = category;
+      body.appendChild(heading);
+
+      entries.forEach(function (entry) {
+        const card = renderMemoryEntry(entry, [
+          {
+            label: "Delete",
+            className: "mem-btn-delete",
+            onClick: function () { deleteMemory(entry.id); },
+          },
+        ]);
+        body.appendChild(card);
+      });
+    });
+
+    if (totalEntries === 0) {
+      const empty = document.createElement("p");
+      empty.className = "memory-empty";
+      empty.textContent = "No entries.";
+      body.appendChild(empty);
+    }
+  } catch (_) {
+    const errNode = document.createTextNode("Network error loading memories.");
+    body.appendChild(errNode);
+  }
+}
+
+
+/* ---------------------------------------------------------
+   Memory sidebar — render helpers
+   --------------------------------------------------------- */
+/**
+ * Render a single memory entry card.
+ *
+ * @param {Object} entry    — the memory entry dict from the API
+ * @param {Array}  actions  — array of {label, className, onClick} button descriptors
+ * @returns {HTMLElement}   — a .memory-entry div
+ */
+function renderMemoryEntry(entry, actions) {
+  const card = document.createElement("div");
+  card.className = "memory-entry";
+
+  // Key line
+  const keyEl = document.createElement("div");
+  keyEl.className = "memory-entry-key";
+  keyEl.textContent = entry.key || "(no key)";
+  card.appendChild(keyEl);
+
+  // Value line
+  const valEl = document.createElement("div");
+  valEl.className = "memory-entry-value";
+  valEl.textContent = entry.value || "";
+  card.appendChild(valEl);
+
+  // Meta line — show reason (pending) or category + source (saved)
+  const metaEl = document.createElement("div");
+  metaEl.className = "memory-entry-meta";
+  let metaParts = [];
+  if (entry.reason) {
+    metaParts.push(entry.reason);
+  }
+  if (entry.category) {
+    metaParts.push(entry.category);
+  }
+  if (entry.source) {
+    metaParts.push(entry.source);
+  }
+  if (entry.created_at) {
+    metaParts.push(entry.created_at);
+  }
+  metaEl.textContent = metaParts.join(" · ");
+  card.appendChild(metaEl);
+
+  // Action buttons
+  if (actions && actions.length > 0) {
+    const actionsEl = document.createElement("div");
+    actionsEl.className = "memory-entry-actions";
+
+    actions.forEach(function (action) {
+      const btn = document.createElement("button");
+      btn.className = "mem-btn " + action.className;
+      btn.textContent = action.label;
+      btn.addEventListener("click", action.onClick);
+      actionsEl.appendChild(btn);
+    });
+
+    card.appendChild(actionsEl);
+  }
+
+  return card;
+}
+
+
+/* ---------------------------------------------------------
+   Memory sidebar — actions
+   --------------------------------------------------------- */
+async function approveMemory(id) {
+  try {
+    await fetch("/memory/pending/" + id + "/approve", { method: "POST" });
+  } catch (_) {
+    // Silently ignore network errors — panel reload will show current state
+  }
+  loadPendingMemories();
+}
+
+async function discardMemory(id) {
+  try {
+    await fetch("/memory/pending/" + id, { method: "DELETE" });
+  } catch (_) {
+    // Silently ignore network errors
+  }
+  loadPendingMemories();
+}
+
+async function deleteMemory(id) {
+  try {
+    await fetch("/memory/" + id, { method: "DELETE" });
+  } catch (_) {
+    // Silently ignore network errors
+  }
+  loadAllMemories();
+}
+
+
+/* ---------------------------------------------------------
+   Settings panel — open / close / switch (Milestone 19)
+   Read-only view; mirrors the memory panel pattern. One panel
+   is open at a time. All data comes from existing GET endpoints.
+   --------------------------------------------------------- */
+let _activeSettingsTab = "profile";
+
+function openSettingsPanel() {
+  document.getElementById("memory-panel").classList.add("hidden"); // one panel at a time
+  document.getElementById("history-panel").classList.add("hidden");
+  document.getElementById("settings-panel").classList.remove("hidden");
+  loadSettingsTab(_activeSettingsTab);
+}
+
+function closeSettingsPanel() {
+  document.getElementById("settings-panel").classList.add("hidden");
+}
+
+function switchSettingsTab(tab) {
+  _activeSettingsTab = tab;
+  document.querySelectorAll(".set-tab").forEach(function (btn) {
+    if (btn.dataset.tab === tab) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+  loadSettingsTab(tab);
+}
+
+function loadSettingsTab(tab) {
+  if (tab === "providers") {
+    loadSettingsProviders();
+  } else if (tab === "integrations") {
+    loadSettingsIntegrations();
+  } else {
+    loadSettingsProfile();
+  }
+}
+
+
+/* ---------------------------------------------------------
+   Settings panel — render helpers (XSS-safe DOM only)
+   --------------------------------------------------------- */
+function _settingsSectionTitle(text) {
+  const el = document.createElement("div");
+  el.className = "settings-section-title";
+  el.textContent = text;
+  return el;
+}
+
+function _settingsRow(key, value, valClass) {
+  const row = document.createElement("div");
+  row.className = "settings-row";
+
+  const k = document.createElement("span");
+  k.className = "settings-key";
+  k.textContent = key;
+
+  const v = document.createElement("span");
+  v.className = "settings-val" + (valClass ? " " + valClass : "");
+  if (value === true) {
+    v.textContent = "yes";
+  } else if (value === false) {
+    v.textContent = "no";
+  } else if (value === null || value === undefined || value === "") {
+    v.textContent = "—";
+  } else {
+    v.textContent = String(value);
+  }
+
+  row.appendChild(k);
+  row.appendChild(v);
+  return row;
+}
+
+function _settingsMessage(body, text, cls) {
+  const el = document.createElement("div");
+  el.className = cls || "settings-empty";
+  el.textContent = text;
+  body.appendChild(el);
+}
+
+
+/* ---------------------------------------------------------
+   Settings panel — data loading (read-only; existing GET endpoints)
+   --------------------------------------------------------- */
+// M26: the three editable routing modes (mirrors the server's accepted set).
+const EDITABLE_MODES = ["quality-first", "balanced", "budget-first"];
+
+async function loadSettingsProfile() {
+  const body = document.getElementById("settings-panel-body");
+  const token = ++_panelLoadToken.settings;
+  body.textContent = "";
+  try {
+    const [profileRes, healthRes, providersRes] = await Promise.all([
+      fetch("/profile"),
+      fetch("/health"),
+      fetch("/providers"),
+    ]);
+    if (token !== _panelLoadToken.settings) return; // superseded by a newer load
+    if (!profileRes.ok) {
+      _settingsMessage(body, "Failed to load profile.", "settings-error");
+      return;
+    }
+    const p = await profileRes.json();
+    const health = healthRes.ok ? await healthRes.json() : {};
+    const providers = providersRes.ok ? await providersRes.json() : [];
+    if (token !== _panelLoadToken.settings) return;
+    const routing = p.routing || {};
+    const memory = p.memory || {};
+
+    body.appendChild(_settingsSectionTitle("Profile"));
+    body.appendChild(_settingsRow("Name", p.name));
+    // App (release) version vs profile schema version are distinct (M26.2).
+    body.appendChild(_settingsRow("App version", health.version));
+    body.appendChild(_settingsRow("Profile schema version", p.version));
+
+    // --- Editable settings (M26): system prompt, mode, preferred provider ---
+    body.appendChild(_settingsSectionTitle("System prompt"));
+    const promptInput = document.createElement("textarea");
+    promptInput.className = "settings-edit-textarea";
+    promptInput.rows = 5;
+    promptInput.value = p.system_prompt || "";
+    body.appendChild(promptInput);
+
+    body.appendChild(_settingsSectionTitle("Routing"));
+    // M26.10: guarantee the canonical value is always a selectable option so the
+    // <select> can't silently fall back to its first option and have a save wipe
+    // a field the user didn't touch (e.g. when /providers failed to load, or the
+    // stored mode is legacy). The option VALUE is the real canonical value.
+    const canonMode = routing.mode || "";
+    const modeOptions = EDITABLE_MODES.map(function (m) { return { value: m, label: m }; });
+    if (canonMode && !modeOptions.some(function (o) { return o.value === canonMode; })) {
+      modeOptions.push({ value: canonMode, label: canonMode + " (current)" });
+    }
+    const modeSelect = _settingsSelect(modeOptions, canonMode);
+    body.appendChild(_settingsControlRow("Mode", modeSelect));
+
+    const canonProv = routing.preferred_provider || "";
+    const provOptions = [{ value: "", label: "Follow mode (none)" }].concat(
+      providers.map(function (pr) { return { value: pr.name, label: pr.name }; })
+    );
+    if (canonProv && !provOptions.some(function (o) { return o.value === canonProv; })) {
+      provOptions.push({ value: canonProv, label: canonProv + " (current)" });
+    }
+    const provSelect = _settingsSelect(provOptions, canonProv);
+    body.appendChild(_settingsControlRow("Preferred provider", provSelect));
+    if (!Array.isArray(providers) || providers.length === 0) {
+      const provNote = document.createElement("div");
+      provNote.className = "settings-note";
+      provNote.textContent = "Provider list unavailable — showing the configured value only.";
+      body.appendChild(provNote);
+    }
+
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "settings-save-btn";
+    saveBtn.textContent = "Save settings";
+    const statusEl = document.createElement("div");
+    statusEl.className = "settings-save-status";
+    saveBtn.addEventListener("click", function () {
+      saveSettingsProfile(
+        {
+          system_prompt: promptInput.value,
+          mode: modeSelect.value,
+          preferred_provider: provSelect.value, // "" → cleared (null) on the server
+        },
+        statusEl,
+        saveBtn
+      );
+    });
+    body.appendChild(saveBtn);
+    body.appendChild(statusEl);
+
+    // --- Read-only context (not editable in this milestone) ---
+    body.appendChild(_settingsSectionTitle("Tools"));
+    const tools = Array.isArray(p.allowed_tools) ? p.allowed_tools : [];
+    body.appendChild(_settingsRow("Allowed", tools.length ? tools.join(", ") : "none"));
+
+    body.appendChild(_settingsSectionTitle("Memory"));
+    body.appendChild(_settingsRow("Auto-save threshold", memory.auto_save_threshold));
+    const review = Array.isArray(memory.require_review_for) ? memory.require_review_for : [];
+    body.appendChild(_settingsRow("Review required for", review.length ? review.join(", ") : "none"));
+  } catch (_) {
+    _settingsMessage(body, "Failed to load profile.", "settings-error");
+  }
+}
+
+function _settingsSelect(options, current) {
+  const sel = document.createElement("select");
+  sel.className = "settings-edit-select";
+  const cur = current || "";
+  options.forEach(function (opt) {
+    const o = document.createElement("option");
+    o.value = opt.value;
+    o.textContent = opt.label;
+    if (opt.value === cur) o.selected = true;
+    sel.appendChild(o);
+  });
+  return sel;
+}
+
+function _settingsControlRow(key, controlEl) {
+  const row = document.createElement("div");
+  row.className = "settings-row";
+  const k = document.createElement("span");
+  k.className = "settings-key";
+  k.textContent = key;
+  controlEl.classList.add("settings-val");
+  row.appendChild(k);
+  row.appendChild(controlEl);
+  return row;
+}
+
+async function saveSettingsProfile(payload, statusEl, btn) {
+  btn.disabled = true;
+  statusEl.textContent = "Saving…";
+  statusEl.className = "settings-save-status";
+  try {
+    const res = await fetch("/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      // Re-render the Profile tab from the canonical persisted /profile so the
+      // user sees the saved values, not optimistic local DOM state (M26.1).
+      // M26.10: only if the user is still on the Profile tab — otherwise this
+      // would clobber whatever tab they switched to during the PATCH.
+      if (_activeSettingsTab !== "profile") return;
+      await loadSettingsProfile();
+      const fresh = document.querySelector("#settings-panel-body .settings-save-status");
+      if (fresh) {
+        fresh.textContent = "Saved. Changes apply to new messages.";
+        fresh.className = "settings-save-status settings-save-ok";
+      }
+      return;
+    }
+    let detail = "Save failed (" + res.status + ").";
+    try {
+      const err = await res.json();
+      if (err && err.detail) detail = err.detail;
+    } catch (_) {}
+    statusEl.textContent = detail;
+    statusEl.className = "settings-save-status settings-save-error";
+  } catch (_) {
+    statusEl.textContent = "Network error — could not save.";
+    statusEl.className = "settings-save-status settings-save-error";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function loadSettingsProviders() {
+  const body = document.getElementById("settings-panel-body");
+  const token = ++_panelLoadToken.settings;
+  body.textContent = "";
+  try {
+    const res = await fetch("/providers");
+    if (token !== _panelLoadToken.settings) return; // superseded by a newer load
+    if (!res.ok) {
+      _settingsMessage(body, "Failed to load providers.", "settings-error");
+      return;
+    }
+    const providers = await res.json();
+    if (token !== _panelLoadToken.settings) return;
+    if (!Array.isArray(providers) || providers.length === 0) {
+      _settingsMessage(body, "No providers configured.");
+      return;
+    }
+    body.appendChild(_settingsSectionTitle("Providers"));
+    providers.forEach(function (p) {
+      const availClass = p.available ? "ok" : "bad";
+      const status =
+        (p.enabled ? "enabled" : "disabled") + " · " + (p.available ? "available" : "unavailable");
+      const label = p.name + "  (" + (p.cost_tier || "?") + "/" + (p.type || "?") + ")";
+      body.appendChild(_settingsRow(label, status, availClass));
+    });
+  } catch (_) {
+    _settingsMessage(body, "Failed to load providers.", "settings-error");
+  }
+}
+
+async function loadSettingsIntegrations() {
+  const body = document.getElementById("settings-panel-body");
+  const token = ++_panelLoadToken.settings;
+  body.textContent = "";
+  try {
+    const res = await fetch("/status/dav");
+    if (token !== _panelLoadToken.settings) return; // superseded by a newer load
+    if (!res.ok) {
+      _settingsMessage(body, "Failed to load integration status.", "settings-error");
+      return;
+    }
+    const data = await res.json();
+    if (token !== _panelLoadToken.settings) return;
+    const names = data && typeof data === "object" ? Object.keys(data) : [];
+    if (names.length === 0) {
+      _settingsMessage(body, "No integration status available.");
+      return;
+    }
+    names.forEach(function (name) {
+      const s = data[name] || {};
+      body.appendChild(_settingsSectionTitle(name));
+      Object.keys(s).forEach(function (key) {
+        const val = s[key];
+        if (Array.isArray(val)) {
+          body.appendChild(_settingsRow(key, val.length ? val.join(", ") : "none"));
+        } else if (val === null || typeof val !== "object") {
+          // Highlight reachability/enabled-style booleans in green/red.
+          let cls = "";
+          if (key === "reachable" || key === "enabled" || key === "ok") {
+            cls = val ? "ok" : "bad";
+          }
+          body.appendChild(_settingsRow(key, val, cls));
+        }
+        // nested objects (e.g. item_counts) are skipped in this read-only view
+      });
+    });
+  } catch (_) {
+    _settingsMessage(body, "Failed to load integration status.", "settings-error");
+  }
+}
+
+
+/* ---------------------------------------------------------
+   History & Attachments panel — open / close / switch (M20)
+   Read-only; mirrors the memory/settings panels. History is
+   the current in-memory session only; Files is a read-only
+   browse of allowlisted files. One panel open at a time.
+   --------------------------------------------------------- */
+let _activeHistoryTab = "conversation";
+
+function openHistoryPanel() {
+  document.getElementById("memory-panel").classList.add("hidden");
+  document.getElementById("settings-panel").classList.add("hidden");
+  document.getElementById("history-panel").classList.remove("hidden");
+  loadHistoryTab(_activeHistoryTab);
+}
+
+function closeHistoryPanel() {
+  document.getElementById("history-panel").classList.add("hidden");
+}
+
+function switchHistoryTab(tab) {
+  _activeHistoryTab = tab;
+  document.querySelectorAll(".hist-tab").forEach(function (btn) {
+    if (btn.dataset.tab === tab) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+  loadHistoryTab(tab);
+}
+
+function loadHistoryTab(tab) {
+  if (tab === "files") {
+    loadHistoryFiles();
+  } else {
+    loadHistoryConversation();
+  }
+}
+
+
+/* ---------------------------------------------------------
+   History tab — current session conversation (read-only)
+   Renders from the live message DOM (the rendered in-memory
+   session); clicking an item scrolls to that message. No new
+   storage or message model is introduced.
+   --------------------------------------------------------- */
+function loadHistoryConversation() {
+  const body = document.getElementById("history-panel-body");
+  // M26.10: bump the token even though this loader is synchronous, so an
+  // in-flight Files fetch is superseded and can't append over this content.
+  ++_panelLoadToken.history;
+  body.textContent = "";
+
+  const wrappers = messagesEl ? messagesEl.querySelectorAll(".message-wrapper") : [];
+
+  // Toolbar: message count + clear action
+  const toolbar = document.createElement("div");
+  toolbar.className = "history-toolbar";
+  const count = document.createElement("span");
+  count.textContent = wrappers.length + (wrappers.length === 1 ? " message" : " messages");
+  const clearBtn = document.createElement("button");
+  clearBtn.className = "history-clear-btn";
+  clearBtn.textContent = "Clear conversation";
+  clearBtn.addEventListener("click", clearConversation);
+  toolbar.appendChild(count);
+  toolbar.appendChild(clearBtn);
+  body.appendChild(toolbar);
+
+  if (wrappers.length === 0) {
+    _historyMessage(body, "No messages yet.");
+    return;
+  }
+
+  wrappers.forEach(function (wrapper) {
+    const role = wrapper.classList.contains("message-user")
+      ? "you"
+      : wrapper.classList.contains("message-error")
+      ? "error"
+      : "assistant";
+    const bubble = wrapper.querySelector(".bubble");
+    const text = bubble ? bubble.textContent : "";
+
+    const item = document.createElement("div");
+    item.className = "history-item";
+
+    const roleEl = document.createElement("div");
+    roleEl.className = "history-role";
+    roleEl.textContent = role;
+
+    const previewEl = document.createElement("div");
+    previewEl.className = "history-preview";
+    previewEl.textContent = text;
+
+    item.appendChild(roleEl);
+    item.appendChild(previewEl);
+    item.addEventListener("click", function () {
+      wrapper.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    body.appendChild(item);
+  });
+}
+
+function clearConversation() {
+  conversationHistory = [];
+  if (messagesEl) {
+    messagesEl.textContent = "";
+  }
+  appendMessage(
+    "assistant",
+    "Hello. I'm " + assistantName + ". How can I help?",
+    null,
+    null,
+    /* isWelcome */ true
+  );
+  // Refresh the (now-empty) history list.
+  loadHistoryConversation();
+}
+
+
+/* ---------------------------------------------------------
+   Files tab — read-only browse of allowlisted files (M20)
+   Shallow listing via POST /files/search ("*"); click to
+   preview content via GET /files/read. Not a file manager.
+   --------------------------------------------------------- */
+async function loadHistoryFiles(showInternal) {
+  const body = document.getElementById("history-panel-body");
+  const token = ++_panelLoadToken.history;
+  body.textContent = "";
+
+  // Toolbar is always shown (even on empty results) so the ops toggle is
+  // reachable. Default hides internal/ops files (M26.3).
+  const toolbar = document.createElement("div");
+  toolbar.className = "history-toolbar";
+  const count = document.createElement("span");
+  count.className = "history-count";
+  const toggle = document.createElement("label");
+  toggle.className = "history-ops-toggle";
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.checked = !!showInternal;
+  cb.addEventListener("change", function () {
+    loadHistoryFiles(cb.checked);
+  });
+  toggle.appendChild(cb);
+  toggle.appendChild(document.createTextNode(" Show internal/ops files"));
+  toolbar.appendChild(count);
+  toolbar.appendChild(toggle);
+  body.appendChild(toolbar);
+
+  if (showInternal) {
+    const note = document.createElement("div");
+    note.className = "history-ops-note";
+    note.textContent = "Showing internal/operational files";
+    body.appendChild(note);
+  }
+
+  try {
+    const res = await fetch("/files/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pattern: "*", exclude_internal: !showInternal }),
+    });
+    if (token !== _panelLoadToken.history) return; // superseded by a newer load
+    if (!res.ok) {
+      _historyMessage(body, "Failed to list files.", "history-error");
+      return;
+    }
+    const paths = await res.json();
+    if (token !== _panelLoadToken.history) return;
+    if (!Array.isArray(paths) || paths.length === 0) {
+      count.textContent = "0 files";
+      _historyMessage(body, showInternal ? "No files found." : "No user files to show.");
+      return;
+    }
+    count.textContent =
+      paths.length + (paths.length === 1 ? " file" : " files") + " · click to preview";
+
+    paths.forEach(function (path) {
+      const item = document.createElement("div");
+      item.className = "file-item";
+      item.textContent = path;
+      item.addEventListener("click", function () {
+        previewFile(path, body);
+      });
+      body.appendChild(item);
+    });
+  } catch (_) {
+    _historyMessage(body, "Failed to list files.", "history-error");
+  }
+}
+
+async function previewFile(path, body) {
+  // Replace any existing preview.
+  const existing = body.querySelector(".file-preview");
+  if (existing) existing.remove();
+
+  const pre = document.createElement("div");
+  pre.className = "file-preview";
+  pre.textContent = "Loading " + path + " ...";
+  body.appendChild(pre);
+
+  try {
+    const res = await fetch("/files/read?path=" + encodeURIComponent(path));
+    if (!res.ok) {
+      pre.textContent = "Cannot preview " + path + " (" + res.status + ").";
+      return;
+    }
+    const data = await res.json();
+    pre.textContent = data && typeof data.content === "string" ? data.content : "(no content)";
+  } catch (_) {
+    pre.textContent = "Failed to read " + path + ".";
+  }
+}
+
+function _historyMessage(body, text, cls) {
+  const el = document.createElement("div");
+  el.className = cls || "history-empty";
+  el.textContent = text;
+  body.appendChild(el);
+}

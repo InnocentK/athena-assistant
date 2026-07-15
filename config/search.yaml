@@ -1,0 +1,19 @@
+search:
+  providers:
+    - name: searxng
+      enabled: true
+      url: "http://localhost:8080"
+      notes: "Self-hosted SearXNG instance. Run separately or add to docker-compose."
+    - name: perplexity
+      enabled: false
+      api_key_env: PERPLEXITY_API_KEY
+      notes: "Fallback. Set PERPLEXITY_API_KEY and set enabled: true to activate."
+    - name: duckduckgo
+      enabled: false
+      notes: "Fallback. No API key needed. Uses unofficial DDG search. Enable as needed."
+    - name: kagi
+      enabled: false
+      api_key_env: KAGI_API_KEY
+      notes: "Fallback. Set KAGI_API_KEY and set enabled: true to activate."
+  fallback_on_empty: true
+  fallback_on_error: true

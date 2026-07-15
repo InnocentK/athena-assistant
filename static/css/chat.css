@@ -1,0 +1,1237 @@
+/* =========================================================
+   Athena Assistant — Chat UI Stylesheet
+   Dark theme, terminal-inspired, no external dependencies.
+   ========================================================= */
+
+/* ---------------------------------------------------------
+   CSS Custom Properties (theme variables)
+   --------------------------------------------------------- */
+:root {
+  /* Backgrounds */
+  --color-bg-body:       #1a1a1a;
+  --color-bg-chrome:     #111111;
+  --color-bg-chat:       #222222;
+  --color-bg-user-msg:   #2a4a7f;
+  --color-bg-asst-msg:   #2a2a2a;
+  --color-bg-err-msg:    #4a1a1a;
+  --color-bg-input:      #1e1e1e;
+  --color-bg-badge:      #333333;
+  --color-bg-btn:        #2a4a7f;
+  --color-bg-btn-hover:  #1e3a6a;
+
+  /* Borders */
+  --color-border-err:    #cc4444;
+  --color-border-input:  #383838;
+  --color-border-badge:  #444444;
+
+  /* Text */
+  --color-text-primary:  #e0e0e0;
+  --color-text-secondary:#888888;
+  --color-text-badge:    #aaaaaa;
+  --color-text-btn:      #ffffff;
+  --color-text-hint:     #555555;
+
+  /* Status dots */
+  --color-dot-ready:     #44cc44;
+  --color-dot-thinking:  #cccc44;
+  --color-dot-error:     #cc4444;
+
+  /* Scrollbar */
+  --color-scrollbar-track: #1a1a1a;
+  --color-scrollbar-thumb: #3a3a3a;
+
+  /* Layout */
+  --header-height:   48px;
+  --footer-height:   60px;
+  --msg-radius:      6px;
+  --max-bubble-width: 72%;
+
+  /* Typography */
+  --font-ui:  system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-msg: "Cascadia Code", "Fira Code", "Menlo", "Consolas", "Monaco", monospace;
+}
+
+
+/* ---------------------------------------------------------
+   Reset & Base
+   --------------------------------------------------------- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background-color: var(--color-bg-body);
+  color: var(--color-text-primary);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+
+/* ---------------------------------------------------------
+   App shell — fills full viewport
+   --------------------------------------------------------- */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+}
+
+
+/* ---------------------------------------------------------
+   Header bar
+   --------------------------------------------------------- */
+#header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--header-height);
+  padding: 0 16px;
+  background-color: var(--color-bg-chrome);
+  border-bottom: 1px solid #2a2a2a;
+  z-index: 10;
+}
+
+#assistant-name {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--color-text-primary);
+  letter-spacing: 0.01em;
+  flex-shrink: 0;
+}
+
+#provider-badge {
+  display: inline-block;
+  background: var(--color-bg-badge);
+  color: var(--color-text-badge);
+  border: 1px solid var(--color-border-badge);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 0.75rem;
+  font-family: var(--font-ui);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+#provider-badge.no-provider {
+  color: var(--color-dot-error);
+  border-color: var(--color-dot-error);
+}
+
+/* Neutral startup state: no chip until a provider is actually selected (M26.1). */
+#provider-badge.hidden {
+  display: none;
+}
+
+#status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-left: auto;
+  transition: background-color 0.2s ease;
+}
+
+#status-dot.status-ready {
+  background-color: var(--color-dot-ready);
+  animation: none;
+}
+
+#status-dot.status-thinking {
+  background-color: var(--color-dot-thinking);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+#status-dot.status-error {
+  background-color: var(--color-dot-error);
+  animation: none;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+
+/* ---------------------------------------------------------
+   Chat window
+   --------------------------------------------------------- */
+#chat-window {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background-color: var(--color-bg-chat);
+  padding: 20px 16px;
+  scroll-behavior: smooth;
+}
+
+#messages {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+
+/* ---------------------------------------------------------
+   Message wrappers — control alignment
+   --------------------------------------------------------- */
+.message-wrapper {
+  display: flex;
+  flex-direction: column;
+  max-width: var(--max-bubble-width);
+}
+
+.message-user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.message-assistant {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.message-error {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+
+/* ---------------------------------------------------------
+   Message bubbles
+   --------------------------------------------------------- */
+.bubble {
+  padding: 9px 13px;
+  border-radius: var(--msg-radius);
+  font-family: var(--font-msg);
+  font-size: 0.875rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--color-text-primary);
+}
+
+.message-user .bubble {
+  background-color: var(--color-bg-user-msg);
+  border-bottom-right-radius: 2px;
+}
+
+.message-assistant .bubble {
+  background-color: var(--color-bg-asst-msg);
+  border-bottom-left-radius: 2px;
+}
+
+.message-error .bubble,
+.bubble-error {
+  background-color: var(--color-bg-err-msg) !important;
+  border-left: 3px solid var(--color-border-err);
+  color: #e0a0a0;
+  border-bottom-left-radius: 2px;
+}
+
+
+/* ---------------------------------------------------------
+   Message metadata (timestamp + provider)
+   --------------------------------------------------------- */
+.meta {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin-top: 3px;
+  font-size: 0.7rem;
+  font-family: var(--font-ui);
+  color: var(--color-text-secondary);
+  padding: 0 2px;
+}
+
+.meta .provider-label {
+  color: #6a8abf;
+  font-weight: 500;
+}
+
+.meta .timestamp {
+  color: var(--color-text-secondary);
+}
+
+
+/* ---------------------------------------------------------
+   Input area (footer)
+   --------------------------------------------------------- */
+#input-area {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 16px;
+  background-color: var(--color-bg-chrome);
+  border-top: 1px solid #2a2a2a;
+  min-height: var(--footer-height);
+}
+
+#message-input {
+  flex: 1 1 auto;
+  background-color: var(--color-bg-input);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-input);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-family: var(--font-msg);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  resize: none;
+  overflow-y: auto;
+  max-height: 120px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+#message-input:focus {
+  border-color: #4a6a9f;
+}
+
+#message-input::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.7;
+}
+
+#message-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#send-btn {
+  flex: 0 0 auto;
+  background-color: var(--color-bg-btn);
+  color: var(--color-text-btn);
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  align-self: flex-end;
+  height: 36px;
+  transition: background-color 0.15s ease;
+}
+
+#send-btn:hover:not(:disabled) {
+  background-color: var(--color-bg-btn-hover);
+}
+
+#send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* #voice-hint removed in Milestone 5 — replaced by #ptt-btn */
+
+
+/* ---------------------------------------------------------
+   Webkit scrollbar styling (thin, dark)
+   --------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-scrollbar-thumb);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4a4a4a;
+}
+
+
+/* ---------------------------------------------------------
+   Memory sidebar panel
+   --------------------------------------------------------- */
+
+#memory-btn {
+  display: inline-block;
+  background: #1e3050;
+  color: #88aadd;
+  border: 1px solid #2a4070;
+  border-radius: 999px;
+  padding: 1px 10px;
+  font-size: 0.75rem;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  flex-shrink: 0;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+#memory-btn:hover {
+  background: #254070;
+}
+
+.memory-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 340px;
+  height: 100%;
+  background: #111;
+  z-index: 20;
+  overflow-y: auto;
+  border-left: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+}
+
+.memory-panel.hidden {
+  display: none;
+}
+
+.memory-panel-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #2a2a2a;
+  flex-shrink: 0;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--color-text-primary);
+}
+
+.memory-panel-header button {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  line-height: 1;
+  transition: color 0.15s ease;
+}
+
+.memory-panel-header button:hover {
+  color: var(--color-text-primary);
+}
+
+.memory-panel-tabs {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  border-bottom: 1px solid #2a2a2a;
+  flex-shrink: 0;
+}
+
+.mem-tab {
+  background: transparent;
+  border: none;
+  color: #888;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-family: var(--font-ui);
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease;
+}
+
+.mem-tab:hover {
+  color: #bbb;
+}
+
+.mem-tab.active {
+  color: #e0e0e0;
+  border-bottom: 2px solid #4a6a9f;
+}
+
+#memory-panel-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding-bottom: 16px;
+}
+
+/* ---------------------------------------------------------
+   Settings panel (Milestone 19) — dedicated rules mirroring
+   the memory panel; read-only view.
+   --------------------------------------------------------- */
+
+#settings-btn {
+  display: inline-block;
+  background: #1e3050;
+  color: #88aadd;
+  border: 1px solid #2a4070;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 0.85rem;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  flex-shrink: 0;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+#settings-btn:hover {
+  background: #254070;
+}
+
+.settings-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 340px;
+  height: 100%;
+  background: #111;
+  z-index: 20;
+  overflow-y: auto;
+  border-left: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-panel.hidden {
+  display: none;
+}
+
+.settings-panel-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #2a2a2a;
+  flex-shrink: 0;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--color-text-primary);
+}
+
+.settings-panel-header button {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  line-height: 1;
+  transition: color 0.15s ease;
+}
+
+.settings-panel-header button:hover {
+  color: var(--color-text-primary);
+}
+
+.settings-panel-tabs {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  border-bottom: 1px solid #2a2a2a;
+  flex-shrink: 0;
+}
+
+.set-tab {
+  background: transparent;
+  border: none;
+  color: #888;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-family: var(--font-ui);
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease;
+}
+
+.set-tab:hover {
+  color: #bbb;
+}
+
+.set-tab.active {
+  color: #e0e0e0;
+  border-bottom: 2px solid #4a6a9f;
+}
+
+#settings-panel-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 8px 0 16px;
+}
+
+.settings-section-title {
+  color: #88aadd;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 12px 16px 4px;
+}
+
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 16px;
+  font-size: 0.8rem;
+  border-bottom: 1px solid #1c1c1c;
+}
+
+.settings-row .settings-key {
+  color: #888;
+  flex-shrink: 0;
+}
+
+.settings-row .settings-val {
+  color: #e0e0e0;
+  text-align: right;
+  word-break: break-word;
+}
+
+.settings-val.ok {
+  color: #6cc070;
+}
+
+.settings-val.bad {
+  color: #d06a6a;
+}
+
+.settings-empty,
+.settings-error {
+  color: #888;
+  font-size: 0.8rem;
+  padding: 12px 16px;
+}
+
+/* ---------------------------------------------------------
+   Editable settings controls (Milestone 26) — Profile tab.
+   Conservative: only the three behaviour-affecting fields.
+   --------------------------------------------------------- */
+.settings-edit-textarea {
+  display: block;
+  width: calc(100% - 32px);
+  margin: 4px 16px 8px;
+  padding: 8px;
+  background: #141414;
+  color: #e0e0e0;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.settings-edit-select {
+  background: #141414;
+  color: #e0e0e0;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+}
+
+.settings-save-btn {
+  margin: 10px 16px 4px;
+  padding: 6px 14px;
+  background: #1e3050;
+  color: #88aadd;
+  border: 1px solid #2a4070;
+  border-radius: 6px;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.settings-save-btn:hover {
+  background: #24395f;
+}
+
+.settings-save-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.settings-save-status {
+  min-height: 1em;
+  margin: 0 16px 12px;
+  font-size: 0.75rem;
+  color: #888;
+}
+
+.settings-save-status.settings-save-ok {
+  color: #6cc070;
+}
+
+.settings-save-status.settings-save-error {
+  color: #d06a6a;
+}
+
+/* ---------------------------------------------------------
+   History & Attachments panel (Milestone 20) — dedicated
+   rules mirroring the memory/settings panels; read-only.
+   --------------------------------------------------------- */
+
+#history-btn {
+  display: inline-block;
+  background: #1e3050;
+  color: #88aadd;
+  border: 1px solid #2a4070;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 0.85rem;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  flex-shrink: 0;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+#history-btn:hover {
+  background: #254070;
+}
+
+.history-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 340px;
+  height: 100%;
+  background: #111;
+  z-index: 20;
+  overflow-y: auto;
+  border-left: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+}
+
+.history-panel.hidden {
+  display: none;
+}
+
+.history-panel-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #2a2a2a;
+  flex-shrink: 0;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--color-text-primary);
+}
+
+.history-panel-header button {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  line-height: 1;
+  transition: color 0.15s ease;
+}
+
+.history-panel-header button:hover {
+  color: var(--color-text-primary);
+}
+
+.history-panel-tabs {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  border-bottom: 1px solid #2a2a2a;
+  flex-shrink: 0;
+}
+
+.hist-tab {
+  background: transparent;
+  border: none;
+  color: #888;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-family: var(--font-ui);
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease;
+}
+
+.hist-tab:hover {
+  color: #bbb;
+}
+
+.hist-tab.active {
+  color: #e0e0e0;
+  border-bottom: 2px solid #4a6a9f;
+}
+
+#history-panel-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 8px 0 16px;
+}
+
+.history-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  font-size: 0.75rem;
+  color: #888;
+}
+
+/* M26.10: the "N files · click to preview" counter (was previously unstyled). */
+.history-count {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+/* M26.10: muted note shown in Settings when the provider list can't be loaded. */
+.settings-note {
+  padding: 4px 16px 8px;
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+}
+
+.history-clear-btn {
+  background: #3a1e1e;
+  color: #d08a8a;
+  border: 1px solid #5a2a2a;
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.history-clear-btn:hover {
+  background: #4a2424;
+}
+
+.history-item {
+  padding: 6px 16px;
+  font-size: 0.8rem;
+  border-bottom: 1px solid #1c1c1c;
+  cursor: pointer;
+}
+
+.history-item:hover {
+  background: #161616;
+}
+
+.history-item .history-role {
+  color: #88aadd;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.history-item .history-preview {
+  color: #ccc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Files tab — internal/ops toggle (M26.3) */
+.history-ops-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  color: #888;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.history-ops-toggle input {
+  cursor: pointer;
+}
+
+.history-ops-note {
+  padding: 4px 16px 8px;
+  font-size: 0.72rem;
+  color: #c9a227;
+}
+
+.file-item {
+  padding: 6px 16px;
+  font-size: 0.8rem;
+  border-bottom: 1px solid #1c1c1c;
+  cursor: pointer;
+  color: #ccc;
+  word-break: break-all;
+}
+
+.file-item:hover {
+  background: #161616;
+  color: #e0e0e0;
+}
+
+.file-preview {
+  margin: 8px 16px;
+  padding: 10px 12px;
+  background: #161616;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.72rem;
+  color: #ccc;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.history-empty,
+.history-error {
+  color: #888;
+  font-size: 0.8rem;
+  padding: 12px 16px;
+}
+
+/* ---------------------------------------------------------
+   Status / progress (M24) + diagnostics view (M24.5)
+   Quiet, compact supporting UI — never the dominant element.
+   --------------------------------------------------------- */
+.chat-status {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 16px;
+  font-size: 0.75rem;
+  color: #888;
+  font-family: var(--font-ui);
+}
+
+.chat-status.hidden {
+  display: none;
+}
+
+/* No animation work while the indicator is idle/hidden (M26.1). */
+.chat-status.hidden .progress-bar-fill {
+  animation: none;
+}
+
+.chat-status-text {
+  white-space: nowrap;
+}
+
+/* Indeterminate in-flight bar — animates only while #chat-status is visible. */
+.progress-bar {
+  position: relative;
+  flex: 0 0 120px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  position: absolute;
+  top: 0;
+  left: -35%;
+  height: 100%;
+  width: 35%;
+  border-radius: 2px;
+  background: var(--accent, #6ea8fe);
+  animation: diag-indeterminate 1.1s ease-in-out infinite;
+}
+
+@keyframes diag-indeterminate {
+  0%   { left: -35%; }
+  100% { left: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-bar-fill {
+    animation: none;
+    left: 0;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
+/* Per-answer diagnostics block (summary + timeline + details). */
+.message-diagnostics {
+  padding: 2px 16px 10px;
+}
+
+.message-summary {
+  font-size: 0.72rem;
+  color: #777;
+  font-family: var(--font-ui);
+}
+
+/* Compact, proportional, outcome-coloured timeline (capped width). */
+.diag-timeline {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  margin-top: 5px;
+  height: 16px;
+  max-width: 460px;
+}
+
+.diag-seg {
+  flex-basis: 0;
+  min-width: 26px;
+  display: flex;
+  align-items: center;
+  padding: 0 5px;
+  border-radius: 2px;
+  font-size: 0.62rem;
+  line-height: 1;
+  color: #d2d2d2;
+  overflow: hidden;
+  cursor: default;
+}
+
+.diag-seg-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diag-seg--ok {
+  background: rgba(110, 168, 254, 0.30);
+}
+
+.diag-seg--skip {
+  background: rgba(255, 255, 255, 0.08);
+  color: #8a8a8a;
+}
+
+.diag-seg--fail {
+  background: rgba(229, 115, 115, 0.30);
+}
+
+.diag-seg--selected {
+  box-shadow: inset 0 0 0 1px rgba(110, 168, 254, 0.85);
+}
+
+/* Collapsed "Details" disclosure. */
+.diag-details {
+  margin-top: 5px;
+  font-size: 0.68rem;
+  color: #888;
+  font-family: var(--font-ui);
+}
+
+.diag-details > summary {
+  cursor: pointer;
+  color: #888;
+  list-style: none;
+  user-select: none;
+  width: max-content;
+}
+
+.diag-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.diag-details > summary:hover {
+  color: #aaa;
+}
+
+.diag-meta {
+  margin: 5px 0;
+  color: #777;
+}
+
+.diag-table {
+  border-collapse: collapse;
+  margin-top: 2px;
+}
+
+.diag-table th,
+.diag-table td {
+  text-align: left;
+  padding: 2px 10px 2px 0;
+  font-weight: 400;
+  color: #999;
+  white-space: nowrap;
+}
+
+.diag-table th {
+  color: #777;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.memory-entry {
+  background: #1e1e1e;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  margin: 8px;
+  padding: 10px 12px;
+}
+
+.memory-entry-key {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: #aaa;
+  margin-bottom: 2px;
+}
+
+.memory-entry-value {
+  font-size: 0.875rem;
+  color: #e0e0e0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.memory-entry-meta {
+  font-size: 0.7rem;
+  color: #555;
+  margin-top: 4px;
+}
+
+.memory-entry-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.mem-btn {
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  border: none;
+  font-family: var(--font-ui);
+  transition: opacity 0.15s ease;
+}
+
+.mem-btn:hover {
+  opacity: 0.8;
+}
+
+.mem-btn-approve {
+  background: #1a4a1a;
+  color: #88cc88;
+}
+
+.mem-btn-discard {
+  background: #4a1a1a;
+  color: #cc8888;
+}
+
+.mem-btn-delete {
+  background: #3a2a1a;
+  color: #ccaa88;
+}
+
+.memory-category-heading {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #555;
+  padding: 12px 8px 2px 8px;
+  margin: 0;
+}
+
+.memory-empty {
+  font-size: 0.8rem;
+  color: #555;
+  padding: 16px;
+  text-align: center;
+}
+
+
+/* ---------------------------------------------------------
+   Push-to-talk button (Milestone 5)
+   --------------------------------------------------------- */
+#ptt-btn {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 36px;
+  border-radius: 4px;
+  border: 1px solid #383838;
+  background: #1e1e1e;
+  color: #888;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  padding: 0;
+  align-self: flex-end;
+}
+
+#ptt-btn:hover:not(:disabled) {
+  background: #2a2a2a;
+  border-color: #4a4a4a;
+  color: #ccc;
+}
+
+#ptt-btn.listening {
+  background: #4a1a1a;
+  border-color: #cc4444;
+  color: #ff6666;
+  animation: pulse 0.8s ease-in-out infinite;
+}
+
+#ptt-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ---------------------------------------------------------
+   Responsive — narrow screens (< 600px)
+   --------------------------------------------------------- */
+@media (max-width: 600px) {
+  #header {
+    padding: 0 10px;
+    gap: 7px;
+  }
+
+  #assistant-name {
+    font-size: 0.875rem;
+  }
+
+  #chat-window {
+    padding: 12px 10px;
+  }
+
+  .message-wrapper {
+    max-width: 90%;
+  }
+
+  #input-area {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  #ptt-btn {
+    display: none;
+  }
+
+  #send-btn {
+    padding: 8px 12px;
+  }
+}

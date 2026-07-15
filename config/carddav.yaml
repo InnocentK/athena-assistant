@@ -1,0 +1,6 @@
+# config/carddav.yaml — CardDAV integration settings
+# Credentials go in .env — NOT here.
+# CARDDAV_URL, CARDDAV_USERNAME, CARDDAV_PASSWORD
+# (If same server as CalDAV, these can match CALDAV_* vars.)
+
+enabled: false           # Set to true after configuring .env

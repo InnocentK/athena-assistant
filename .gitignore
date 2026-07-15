@@ -1,0 +1,84 @@
+# =============================================================================
+# Athena Assistant — .gitignore
+# =============================================================================
+
+# Environment — never commit secrets
+.env
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pycache
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Distribution / packaging
+*.egg-info/
+dist/
+build/
+*.egg
+*.whl
+
+# Type checker caches
+.mypy_cache/
+.dmypy.json
+.pytype/
+
+# Test caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# -----------------------------------------------------------------------------
+# Runtime output — excluded by default
+# These directories are created at runtime and are machine-specific.
+# -----------------------------------------------------------------------------
+
+# Application logs
+logs/
+
+# Audit trail — keep source (audit/*.py); ignore only the runtime logs it writes
+audit/*.log
+
+# Local data storage
+data/
+
+# -----------------------------------------------------------------------------
+# Profile memory — excluded by default
+# Memory files contain personal data and are intentionally git-excluded.
+# If you want to version your memory (e.g. in a private repo), remove the
+# line below or add a per-profile exception:
+#   !profiles/myprofile/memory/
+# -----------------------------------------------------------------------------
+profiles/*/memory/
+
+# Keep archive placeholder in version control even when memory dir is excluded
+!profiles/*/memory/archive/
+!profiles/*/memory/archive/.gitkeep
+
+# Import conflict queues
+data/import_conflicts/
+!data/import_conflicts/.gitkeep
+
+# Backup exports
+data/exports/*.zip
+data/restore_staging/
+!data/restore_staging/.gitkeep
+
+# Frontend (jsdom) tests — Node deps are dev-only, never committed (M26.22)
+node_modules/

@@ -1,0 +1,21 @@
+# config/files.yaml — File access allowlist
+# Edit this file to grant the assistant access to directories/files.
+# Reload takes effect without restart via PATCH /files/allowlist/reload.
+# Permissions: search (glob), read, write — each independently toggled.
+# NEVER add the project source root with write: true.
+entries:
+  - path: "data"
+    label: "Data directory (read/write)"
+    search: true
+    read: true
+    write: true
+  - path: "logs"
+    label: "Logs directory (read-only)"
+    search: true
+    read: true
+    write: false
+  - path: "audit"
+    label: "Audit directory (read-only)"
+    search: true
+    read: true
+    write: false

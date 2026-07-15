@@ -1,0 +1,52 @@
+providers:
+  ranking:
+    quality_first: [claude, gemini, chatgpt, grok]
+    balanced: [gemini, claude, chatgpt, grok]
+    budget_first: [ollama, grok, gemini, chatgpt, claude]
+  fallback_on_error: true
+  log_provider_choice: true
+  diagnostics:                 # M22: measure-only latency instrumentation
+    enabled: true              # set false to disable trace/store/summary logging
+    ring_buffer_size: 50       # how many recent request traces to keep in memory
+    log_level: info            # info | debug — level of the one-line latency summary
+  adapters:
+    claude:
+      type: cli
+      enabled: true
+      cost_tier: high
+    gemini:
+      type: cli
+      enabled: true
+      cost_tier: medium
+    grok:
+      type: cli
+      enabled: true
+      cost_tier: low
+      transport: cli             # M21: "cli" (default) | "api"; GROK_TRANSPORT env overrides this
+      api_key_env: XAI_API_KEY   # API transport key (secret lives in .env)
+      model_env: GROK_MODEL      # API model env var (default grok-4.3)
+      api_url_env: GROK_API_URL  # API base-url env var (default https://api.x.ai/v1)
+      notes: "One logical Grok provider, selectable transport (cli|api). Default cli; api is opt-in via transport: api or GROK_TRANSPORT=api. Connection params/secrets via env."
+    chatgpt:
+      type: api
+      enabled: true
+      cost_tier: medium
+      api_key_env: OPENAI_API_KEY
+    ollama:
+      type: api
+      enabled: false           # opt-in only — set true after configuring OLLAMA_API_URL + OLLAMA_MODEL
+      cost_tier: low
+      api_url_env: OLLAMA_API_URL
+      model_env: OLLAMA_MODEL
+      api_key_env: OLLAMA_API_KEY   # optional; a dummy key is used if unset
+      notes: "Local Ollama via OpenAI-compatible API. One active model per config (OLLAMA_MODEL). Participates in budget_first or as preferred_provider only; never auto-tops balanced/quality_first."
+    hermes:
+      type: cli
+      enabled: false           # opt-in — install Hermes and flip to true; NOT in any ranking by default
+      cost_tier: medium        # routing hint only (Hermes may use paid linked models)
+      bin_env: HERMES_BIN      # documents the binary override env var (default "hermes")
+      notes: "CLI-backed Hermes provider (hermes chat -q). Opt-in and not in any ranking by default — add it to a ranking or set preferred_provider: hermes to use it. Answer is parsed from the Hermes box; parse_mode recorded in response metadata."
+    chatgpt_cli:
+      type: stub
+      enabled: false
+      notes: "Stub adapter only. Enable when ChatGPT CLI auth details are confirmed."

@@ -1,0 +1,87 @@
+# pyproject.toml — packaging metadata for the `athena` console command (Milestone 17).
+#
+# This is intentionally minimal and exists for ONE purpose: enable a local
+# editable install (`pip install -e .`) that puts an `athena` command on PATH.
+#
+#   pip install -r requirements.txt   # runtime dependencies live here, not below
+#   pip install -e .                  # adds the `athena` console script
+#
+# Runtime dependencies are NOT declared here on purpose — requirements.txt
+# remains the single source of truth for them. This file does not replace the
+# requirements.txt / uvicorn / `python -m cli` workflows.
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "athena-assistant"
+# M26.17: version is dynamic — the single source is core/version.py
+dynamic = ["version"]
+description = "Local-first AI assistant — FastAPI service plus a one-shot CLI."
+requires-python = ">=3.10"
+
+[project.scripts]
+athena = "cli.main:main"
+
+# Flat (non-src) layout: declare packages explicitly so setuptools does not
+# fail auto-discovery on the multiple top-level packages.
+[tool.setuptools.dynamic]
+version = {attr = "core.version.__version__"}
+
+[tool.setuptools]
+py-modules = ["main"]
+packages = [
+    "app",
+    "app.routers",
+    "audit",
+    "backup",
+    "caldav_integration",
+    "carddav_integration",
+    "cli",
+    "core",
+    "dav_io",
+    "dav_status",
+    "diagnostics",
+    "files",
+    "memory",
+    "nextcloud_integration",
+    "providers",
+    "saved",
+    "voice",
+]
+
+# ---------------------------------------------------------------------------
+# Ruff — lint gate (M26.19). Correctness-strict, style-lenient by design: the
+# selected rules catch real defects (undefined/unused names, exception-chaining,
+# bugbear footguns) without turning "add a linter" into a whole-tree reformat.
+# Run: `task lint` (check) / `task lint:fix` (autofix). Config is the single
+# source; do not scatter per-file `# noqa` unless a rule is a genuine false
+# positive (and say why in the comment).
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+extend-exclude = [".venv", "logs", "audit", "data", "profiles"]
+
+[tool.ruff.lint]
+# E4 import errors · E7 statement errors · E9 syntax · F pyflakes
+# (unused/undefined/redefined) · B bugbear (real footguns + exception chaining).
+# Intentionally NOT enabled yet: I (isort — ~41-file reorder, a separate opt-in),
+# the wider E/W/D/ANN families, and `ruff format` (whole-tree reformat).
+select = ["E4", "E7", "E9", "F", "B"]
+
+# ---------------------------------------------------------------------------
+# mypy — type gate (M26.21). Lenient by design (not `strict`): catches real
+# contract/narrowing gaps without demanding 100% annotation coverage. Runs on
+# the source only (tests use heavy MagicMock/monkeypatch dynamism — high-noise,
+# low-value to type-check). Run: `task typecheck`. Tighten in future milestones.
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true          # caldav / vobject / openai ship no usable stubs here
+disable_error_code = ["import-untyped"]  # env-robust: don't depend on stub discovery for yaml/requests
+# warn_unused_ignores is intentionally OFF for this lenient first adoption —
+# pre-existing `# type: ignore`s on third-party API calls may be load-bearing in
+# a clean venv (different stub resolution). Turning it on is a future tightening.
+exclude = ['(^|/)(\.venv|tests)/']

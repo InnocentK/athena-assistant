@@ -1,0 +1,41 @@
+# docker-compose.yml — Athena Assistant
+# Usage:
+#   docker compose up --build          # first run
+#   docker compose up -d               # detached
+#   docker compose down                # stop and remove containers
+#   docker compose logs -f athena      # follow logs
+#
+# Environment: copy .env.example to .env and fill in credentials before running.
+
+version: "3.9"
+
+services:
+  athena:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: athena-assistant
+    ports:
+      - "${ATHENA_PORT:-8000}:8000"
+    volumes:
+      # Config and profiles: editable without rebuild
+      - ./config:/app/config
+      - ./profiles:/app/profiles
+      # Runtime directories: persist across container restarts
+      - athena-logs:/app/logs
+      - athena-audit:/app/audit
+      - athena-data:/app/data
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  athena-logs:
+  athena-audit:
+  athena-data:

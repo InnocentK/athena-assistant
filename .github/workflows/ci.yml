@@ -1,0 +1,58 @@
+# .github/workflows/ci.yml — Athena CI (M26.20).
+#
+# Lint + full test suite on every push and pull request. Needs NO secrets: the
+# suite is fully mocked (the M26.17 conftest hermeticity fixture guarantees no
+# real provider CLI runs), so it's safe on forks and public repos.
+#
+# INERT until the project has a GitHub remote — see docs/CI.md to activate.
+# The same gate runs locally via `task ci`.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11"]   # 3.10 = floor (pyproject), 3.11 = tested locally
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .          # proves packaging (console script + app/ packages, M26.18)
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Type-check (mypy)
+        run: mypy .
+
+      - name: Test (pytest)
+        run: pytest -q
+
+  # Frontend (jsdom) tests — independent of the Python job; needs Node, not deps.
+  test-js:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci || npm install
+      - run: npm run test

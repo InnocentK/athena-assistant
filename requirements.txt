@@ -1,0 +1,30 @@
+# requirements.txt — runtime + dev dependencies (single source of truth).
+#
+# Pinned to exact tested versions (M26.19) for reproducibility: this is a
+# single-user application, not a library, so exact pins are appropriate and
+# easiest to reason about. Bumping a pin is a DELIBERATE, tested act — do it in
+# its own change and run the full suite (some behaviour is version-dependent,
+# e.g. caldav>=3 forwards `timeout=` per M26.12, defusedxml rejects entities
+# per M26.15). Versions captured 2026-07-14 on Python 3.11.
+
+fastapi==0.139.0
+uvicorn[standard]==0.46.0
+pyyaml==6.0.3
+python-dotenv==1.2.2
+pydantic==2.13.3
+openai==2.45.0
+jinja2==3.1.6
+python-multipart==0.0.26
+caldav==3.2.1
+vobject==0.9.9
+requests==2.33.1
+defusedxml==0.7.1
+
+# Dev / test
+pytest==9.1.1
+httpx==0.28.1
+pytest-mock==3.15.1
+ruff==0.15.11
+mypy==2.3.0
+types-PyYAML==6.0.12.20260518
+types-requests==2.33.0.20260712

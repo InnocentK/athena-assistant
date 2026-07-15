@@ -1,0 +1,38 @@
+# tests/Taskfile.yml — Test tasks for Athena Assistant
+# Included by root Taskfile.yml under the "test" namespace.
+# Run from project root: task test:run, task test:verbose, etc.
+
+version: "3"
+
+vars:
+  PYTEST: '{{if eq OS "windows"}}..\\.venv\\Scripts\\pytest.exe{{else}}../.venv/bin/pytest{{end}}'
+
+tasks:
+
+  run:
+    desc: "Run the full test suite"
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - "{{.PYTEST}}"
+
+  verbose:
+    desc: "Run tests with full output and long tracebacks"
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - "{{.PYTEST}} -v --tb=long"
+
+  file:
+    desc: "Run a single test file (usage: task test:file FILE=tests/test_foo.py)"
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - "{{.PYTEST}} {{.FILE}}"
+    requires:
+      vars: [FILE]
+
+  clean:
+    desc: "Remove test artifacts (.pytest_cache, .coverage, htmlcov)"
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - rm -rf .pytest_cache htmlcov .coverage 2>/dev/null || true
+      - echo "Test artifacts cleaned."
+    platforms: [linux, darwin]

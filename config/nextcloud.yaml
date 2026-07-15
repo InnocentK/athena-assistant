@@ -1,0 +1,7 @@
+# config/nextcloud.yaml — Nextcloud integration settings
+# Credentials go in .env — NOT here.
+# NEXTCLOUD_URL, NEXTCLOUD_USERNAME, NEXTCLOUD_PASSWORD
+
+enabled: false           # Set to true after configuring .env
+default_list_path: "/"   # Default path for file listing
+max_file_read_mb: 2      # Maximum file size to read (MB)

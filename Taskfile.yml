@@ -1,0 +1,175 @@
+# Taskfile.yml — Athena Assistant task runner
+# https://taskfile.dev
+#
+# Usage:
+#   task --list          # show all available tasks
+#   task install         # install Python dependencies
+#   task run             # start local dev server
+#   task up              # start Docker stack
+#
+# Prerequisites: https://taskfile.dev/installation/
+# Run without Taskfile: use run.sh (macOS/Linux) or run.bat (Windows)
+
+version: "3"
+
+includes:
+  test:
+    taskfile: ./tests/Taskfile.yml
+    dir: .
+
+vars:
+  PORT: '{{.PORT | default "8000"}}'
+  VENV: ".venv"
+  PYTHON: '{{if eq OS "windows"}}.venv\Scripts\python.exe{{else}}.venv/bin/python{{end}}'
+  PIP: '{{if eq OS "windows"}}.venv\Scripts\pip.exe{{else}}.venv/bin/pip{{end}}'
+  UVICORN: '{{if eq OS "windows"}}.venv\Scripts\uvicorn.exe{{else}}.venv/bin/uvicorn{{end}}'
+  RUFF: '{{if eq OS "windows"}}.venv\Scripts\ruff.exe{{else}}.venv/bin/ruff{{end}}'
+  MYPY: '{{if eq OS "windows"}}.venv\Scripts\mypy.exe{{else}}.venv/bin/mypy{{end}}'
+
+tasks:
+
+  # ---------------------------------------------------------------------------
+  # Setup
+  # ---------------------------------------------------------------------------
+
+  setup:
+    desc: "First-time project setup: create venv, install deps, copy .env.example"
+    cmds:
+      - python3 -m venv {{.VENV}}
+      - "{{.PIP}} install --quiet -r requirements.txt"
+      - cmd: |
+          if [ ! -f .env ]; then
+            cp .env.example .env
+            echo "Notice: .env created from .env.example — edit it before running."
+          fi
+      - mkdir -p logs audit data/carddav_staged data/import_conflicts
+      - 'echo "Setup complete. Activate with: source .venv/bin/activate"'
+    platforms: [linux, darwin]
+
+  install:
+    desc: "Install / update Python dependencies into the active venv"
+    cmds:
+      - "{{.PIP}} install --quiet -r requirements.txt"
+
+  # ---------------------------------------------------------------------------
+  # Lint (M26.19) — ruff correctness gate; config in pyproject.toml [tool.ruff]
+  # ---------------------------------------------------------------------------
+
+  lint:
+    desc: "Run the ruff lint check (correctness gate)"
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - "{{.RUFF}} check ."
+
+  lint:fix:
+    desc: "Auto-fix the ruff violations that are safely fixable"
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - "{{.RUFF}} check --fix ."
+
+  typecheck:
+    desc: "Run mypy (lenient type gate, M26.21); config in pyproject.toml [tool.mypy]"
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - "{{.MYPY}} ."
+
+  test:js:
+    desc: "Run the frontend (jsdom) tests for static/js/* — needs Node (npm install first)"
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - npm run test
+
+  ci:
+    desc: "Run the full CI gate locally (lint + typecheck + editable install + suite) — same as .github/workflows/ci.yml"
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - "{{.RUFF}} check ."
+      - "{{.MYPY}} ."
+      - "{{.PIP}} install --quiet -e ."
+      - "{{.PYTHON}} -m pytest -q"
+
+  # ---------------------------------------------------------------------------
+  # Local development
+  # ---------------------------------------------------------------------------
+
+  run:
+    desc: "Start local dev server with auto-reload (PORT={{.PORT}})"
+    cmds:
+      - "{{.UVICORN}} main:app --reload --host 0.0.0.0 --port {{.PORT}}"
+    env:
+      PORT: "{{.PORT}}"
+
+  run:prod:
+    desc: "Start local server without auto-reload, single worker (PORT={{.PORT}})"
+    cmds:
+      - "{{.UVICORN}} main:app --host 0.0.0.0 --port {{.PORT}} --workers 1"
+
+  health:
+    desc: "Check /health endpoint (requires running server)"
+    cmds:
+      - curl -s http://localhost:{{.PORT}}/health | python3 -m json.tool
+
+  # ---------------------------------------------------------------------------
+  # Docker
+  # ---------------------------------------------------------------------------
+
+  up:
+    desc: "Build and start the Docker stack (detached)"
+    cmds:
+      - docker compose up --build -d
+
+  down:
+    desc: "Stop and remove Docker containers"
+    cmds:
+      - docker compose down
+
+  build:
+    desc: "Build the Docker image without starting containers"
+    cmds:
+      - docker compose build
+
+  logs:
+    desc: "Follow Docker container logs"
+    cmds:
+      - docker compose logs -f athena
+
+  # ---------------------------------------------------------------------------
+  # Cleanup
+  # ---------------------------------------------------------------------------
+
+  backup:
+    desc: "Create a backup zip of profiles and config"
+    cmds:
+      - cmd: |
+          curl -s -X POST http://localhost:{{.PORT}}/backup/exports \
+            -H 'Content-Type: application/json' \
+            -d '{"include_audit":false,"include_data":false}' | python3 -m json.tool
+
+  backup:list:
+    desc: "List available backup exports"
+    cmds:
+      - curl -s http://localhost:{{.PORT}}/backup/exports | python3 -m json.tool
+
+  ops:audit:
+    desc: "Tail today's ops audit log (requires running server with audit writes)"
+    cmds:
+      - cmd: |
+          LOG=$(ls -t audit/*_ops_audit.log 2>/dev/null | head -1)
+          if [ -z "$LOG" ]; then echo "No ops audit log found."; else tail -40 "$LOG"; fi
+    platforms: [linux, darwin]
+
+  restore:diff:
+    desc: "Dry-run diff for a backup zip. Usage: task restore:diff ZIP=<filename>"
+    cmds:
+      - curl -s http://localhost:{{.PORT}}/backup/exports/{{.ZIP}}/diff | python3 -m json.tool
+    requires:
+      vars: [ZIP]
+
+  clean:
+    desc: "Remove Python bytecode and build artifacts"
+    cmds:
+      - find . -type d -name __pycache__ -not -path './.venv/*' -exec rm -rf {} + 2>/dev/null || true
+      - find . -name '*.pyc' -not -path './.venv/*' -delete 2>/dev/null || true
+      - find . -name '*.pyo' -not -path './.venv/*' -delete 2>/dev/null || true
+      - echo "Clean complete."
+    platforms: [linux, darwin]

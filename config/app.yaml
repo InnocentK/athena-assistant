@@ -1,0 +1,6 @@
+# Static app metadata only. The running app/release version is reported by
+# GET /health (sourced from the FastAPI app version) — intentionally NOT
+# duplicated here, to avoid a second, drifting source of truth (M26.2).
+app:
+  name: "Athena Assistant"
+  description: "Local-first AI assistant platform"
