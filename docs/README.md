@@ -8,6 +8,7 @@ Which doc do you want?
 |---|---|
 | [../README.md](../README.md) | Understand what Athena is (start here) |
 | [INSTALLATION.md](INSTALLATION.md) | Install and run it (local or Docker) + the `athena` CLI |
+| [PLATFORMS.md](PLATFORMS.md) | Know which platforms are supported (Mac/Linux/Windows/container/mobile) + remote-access pattern |
 | [CONFIGURATION.md](CONFIGURATION.md) | Configure providers, routing, profiles, allowlist, integrations |
 | [VALIDATION.md](VALIDATION.md) | Quickly check a running instance is healthy |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Fix a common problem |

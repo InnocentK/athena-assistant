@@ -149,12 +149,27 @@ frontend test harness). Full per-milestone detail is in `CHANGELOG.md`.
 - **M26.26 — pre-commit hooks.** ruff+mypy+hygiene at commit time; **needs
   M26.23 first.** → `docs/specs/M26.26-pre-commit.md`
 
-**Open feature work — do not start without an approved spec:**
+**Specced, awaiting go-ahead (docs mini-milestone + feature epics — specs in `docs/specs/`):**
 
-- **M27 — Advanced CLI live status / status-bar improvements.** A richer live
-  CLI status line (current provider/model, elapsed time, lightweight metadata),
-  inspired by tools like Hermes. Additive only; not a TUI rewrite. Sole
-  remaining roadmap item.
+- **M26.27 — platform support & limitations docs.** Docs-only (no bump): a
+  "Running Athena on <platform>" support matrix (Mac tested / Linux expected /
+  Windows CLI-adapter caveats / container API-transport-only / mobile via
+  Tailscale-VPN, no native app) + a remote-access pointer. Do first — the
+  out-of-tree LXC installer and the remote-access docs both reference it.
+  → `docs/specs/M26.27-platform-support-docs.md`
+- **M27 — Live status & usage telemetry (epic).** Renamed from "Advanced CLI
+  live status" (the old title buried cross-surface work). **M27.0** live status
+  core (richer CLI status line; stderr; additive, not a TUI) → 2.7.0; **M27.1**
+  token/context usage on the web UI *and* athena-cli, best-effort per transport
+  off the shared M22 diagnostics trace, honest "unavailable" fallback → 2.7.1.
+  → `docs/specs/M27-live-status-and-usage.md`
+- **M28 — Portable Profiles (epic).** Snapshot (not sync) export/import of a
+  host-agnostic, secret-free identity bundle (system prompt + memory + portable
+  prefs; strips credentials, endpoint URLs, file allowlists, host paths,
+  machine_overrides, diagnostics/audit, chat history; memory kept-but-reviewed).
+  Allowlist-built + leak-guarded on both sides; builds on `backup/manager.py`.
+  **M28.0** export → 2.8.0; **M28.1** import → 2.8.1.
+  → `docs/specs/M28-portable-profiles.md`
 
 Historical specs for shipped milestones are archived in `docs/specs/` (they
 record the scope + measured counts + self-review for M26.19–M26.22).

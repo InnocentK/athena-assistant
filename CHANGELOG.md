@@ -4,6 +4,35 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [Unreleased] — Milestone 26.27 — platform support & limitations docs
+
+Documentation only — **no code change; the app stays at 2.6.25**. Spec:
+`docs/specs/M26.27-platform-support-docs.md`.
+
+### Added
+- **`docs/PLATFORMS.md`** — an honest "Running Athena on <platform>" support
+  matrix: **macOS** *Tested* (reference experience, both transports), **Linux**
+  *Expected good* (POSIX + exercised by the CI matrix; recommended server),
+  **Windows** *Works with caveats* (FastAPI/UI/API transports expected to run,
+  but the **CLI provider adapters are POSIX-flavoured and untested on Windows** —
+  use WSL2), **Container (Docker/LXC)** *API-transport-only by default* (vendor
+  CLIs absent + need interactive login unless baked into the image), **Mobile**
+  *no native app* (reach a server instance over Tailscale/VPN via the browser
+  UI). Includes a **Remote access** section restating the no-auth posture and the
+  two safe patterns (Tailscale/VPN or authenticated reverse proxy + TLS). This is
+  the single source of truth the out-of-tree LXC installer and the (later)
+  remote-access doc reference rather than restate.
+
+### Changed
+- `docs/README.md` links the new `PLATFORMS.md` from the "Getting started"
+  section.
+
+### Notes
+- Deliberately honest about support *levels*: "Tested" (macOS) vs "Expected
+  good" (Linux) vs "Works with caveats" (Windows/container) — the value is not
+  over-promising an untested path to a future operator or agent. No code was
+  touched; documenting current behaviour, not changing it.
+
 ## [Unreleased] — Milestone 26.26 — pre-commit hooks
 
 Tooling only — **no code change; the app stays at 2.6.25** (the two whitespace/

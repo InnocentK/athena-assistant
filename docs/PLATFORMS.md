@@ -1,0 +1,68 @@
+# Running Athena on <platform> — support matrix
+
+This is the honest, single source of truth for **which platforms Athena is
+supported on, to what degree, and with what caveats.** "Supported" here means
+*we have run it and it works*; the other levels are stated as exactly what they
+are so a future operator (or agent) doesn't over-trust an untested path. The
+out-of-tree LXC installer and the remote-access guidance both reference this
+page rather than restating its caveats.
+
+Two facts shape every row below:
+
+- Athena has **two provider transports**. *API transports* (chatgpt / grok-api /
+  ollama) talk to an OpenAI-compatible endpoint using keys in `.env` — they need
+  only Python and network. *CLI transports* (claude / gemini / grok / hermes)
+  shell out to vendor command-line tools installed on the host, which must be
+  present and logged in. Most platform caveats are really *CLI-transport*
+  caveats.
+- Athena is **single-user and has no auth layer** by design. It must never bind
+  an untrusted network interface. Remote reach is the operator's responsibility
+  (see [Remote access](#remote-access)).
+
+## Support matrix
+
+| Platform | Support level | What works / what to know |
+|---|---|---|
+| **macOS (desktop)** | **Tested** | The primary development and verification target. Both transports work: API transports with keys in `.env`, and CLI transports given the vendor CLIs are installed and logged in. This is the reference experience. |
+| **Linux (desktop / server)** | **Expected good** | Same POSIX assumptions as macOS, and the CI matrix runs the full suite on Linux (Python 3.10 and 3.11), so the Python side is actively exercised on every change. CLI transports work when the vendor CLIs are present. **Recommended server platform.** |
+| **Windows** | **Works with caveats** | The FastAPI backend, the browser UI, and **API transports** are expected to run under a normal CPython install. The weak point is the **CLI provider adapters**: they launch vendor CLIs as subprocesses with POSIX-flavoured assumptions (argument lists, `stdin=DEVNULL`, signal/timeout handling, path and quoting rules) and are **not tested on Windows**. If you want CLI transports on Windows, run Athena under **WSL2**, which behaves like the Linux row. Native-Windows CLI transports are unverified — treat them as unsupported until tested. |
+| **Container (Docker / LXC)** | **Works — API-transport-only by default** | Python + FastAPI run trivially in a stock container. But the **vendor CLIs are not present, and they usually require interactive login**, so a headless container is **API-transport-only** (chatgpt / grok-api / ollama via keys in `.env`) unless the operator deliberately bakes the CLIs *and their authentication* into the image. Plan container deployments around API transports; treat CLI transports as an opt-in you build in yourself. |
+| **Mobile (iOS / Android)** | **No native app — not a run target** | Athena is a server process; there is no mobile build and none is planned. Use Athena *from* a phone by reaching a desktop/server instance **remotely over Tailscale/VPN** and opening the existing browser UI — don't try to run the server *on* the phone. |
+
+### How to read the levels
+
+- **Tested** — we run it; it works.
+- **Expected good** — same platform assumptions as a tested one and exercised
+  indirectly (e.g. Linux via CI), but not the author's daily driver.
+- **Works with caveats** — part of it is fine, part of it is explicitly untested;
+  the caveat says which part.
+- **Not a run target** — intentionally unsupported; use the documented
+  alternative instead.
+
+## Remote access
+
+Athena has **no built-in authentication** — it assumes it is talking to its
+single owner on a trusted local interface. That assumption is load-bearing:
+**do not expose Athena directly to an untrusted network.** There is no login
+page to protect it.
+
+To reach an instance from another machine or from a phone, put the access
+control *outside* Athena, using either of the safe patterns:
+
+- **Tailscale / VPN** (simplest): keep Athena bound to loopback or the private/
+  tailnet interface and reach it over the VPN. Access control is the tailnet's
+  job.
+- **Authenticated reverse proxy + TLS**: front Athena with a proxy (Caddy /
+  nginx) that terminates TLS and enforces authentication, with Athena itself
+  still bound to loopback.
+
+Either way, Athena stays bound to a private interface and never to `0.0.0.0` on
+a public bridge. The security trade-offs of exposing a server are the operator's
+to manage, as with any self-hosted application. See [SECURITY.md](SECURITY.md)
+for what Athena does and does not protect.
+
+## See also
+
+- [INSTALLATION.md](INSTALLATION.md) — installing and running (local or Docker).
+- [SECURITY.md](SECURITY.md) — Athena's security model and boundaries.
+- [CONFIGURATION.md](CONFIGURATION.md) — providers, transports, and integrations.
