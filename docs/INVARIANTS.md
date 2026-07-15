@@ -48,6 +48,17 @@ This file is the durable contract; per-release history lives in
   `test_ui_correctness.py`) are kept alongside the runtime tests — they catch
   "someone rewrote the file" cheaply even when no matching JS test exists.
 
+## Coverage floor (M26.24)
+
+- **`task coverage` must stay ≥ the `fail_under` floor** (70%, in
+  `pyproject.toml` `[tool.coverage.report]`; source-only real number ~74%). CI
+  enforces it via `pytest --cov`. The floor is a **ratchet that only goes up** —
+  raise it deliberately as coverage improves; never lower it to make a change
+  pass (fix the tests instead). Coverage config omits `tests/`/`__init__.py` so
+  the number reflects application code, not the test files.
+- Coverage measures *execution, not correctness* — it complements the suite's
+  assertions, never replaces them (the M26.18 bug ran at 100% line-execution).
+
 ## Dependency audit (M26.25)
 
 - **Pinned dependencies must stay CVE-clean.** `task audit` (`pip-audit -r

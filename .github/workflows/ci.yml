@@ -49,8 +49,9 @@ jobs:
         continue-on-error: true
         run: python -m pip_audit -r requirements.txt --no-deps
 
-      - name: Test (pytest)
-        run: pytest -q
+      - name: Test (pytest + coverage floor)
+        # Coverage floor (fail_under) is enforced from pyproject [tool.coverage]. (M26.24)
+        run: pytest --cov --cov-report=term-missing
 
   # Frontend (jsdom) tests — independent of the Python job; needs Node, not deps.
   test-js:

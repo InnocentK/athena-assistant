@@ -77,6 +77,33 @@ select = ["E4", "E7", "E9", "F", "B"]
 # the source only (tests use heavy MagicMock/monkeypatch dynamism — high-noise,
 # low-value to type-check). Run: `task typecheck`. Tighten in future milestones.
 # ---------------------------------------------------------------------------
+[tool.coverage.run]
+# Measure APPLICATION code only — the test files are ~100% by construction and
+# would inflate the number (M26.24). source=["."] + these omits.
+source = ["."]
+omit = [
+    "tests/*",
+    ".venv/*",
+    "*/__pycache__/*",
+    "app/routers/__init__.py",
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+# fail_under is a ratchet-down GUARD, set BELOW today's real source-only number
+# (measured 74% at M26.24), not a target — raise it deliberately, never let it
+# silently erode. Headroom is intentional: the DAV/network clients are mocked but
+# not fully exercised (live servers needed), so their coverage swings a few points
+# with small test changes. Raise the floor as those gaps get real tests.
+fail_under = 70
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+
 [tool.mypy]
 python_version = "3.10"
 ignore_missing_imports = true          # caldav / vobject / openai ship no usable stubs here

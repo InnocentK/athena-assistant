@@ -116,6 +116,19 @@ source .venv/bin/activate
 pytest
 ```
 
+### Coverage (M26.24)
+
+```bash
+task coverage        # pytest --cov --cov-report=term-missing
+task coverage:html   # browsable htmlcov/index.html
+```
+
+Config in `pyproject.toml` `[tool.coverage]` (measures application code only —
+`tests/` omitted). Source-only baseline is **~74%**; CI enforces a `fail_under`
+floor of **70%** (a ratchet, not a target — raise it as coverage improves). The
+biggest gaps are the DAV/network clients, whose critical paths are covered by
+the M26.12–M26.15 tests but which would need live servers to exercise fully.
+
 ### Run a specific test file
 
 ```bash

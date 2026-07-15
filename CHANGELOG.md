@@ -4,6 +4,33 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [Unreleased] — Milestone 26.24 — Coverage measurement
+
+Test-infra only — **no code change; the app stays at 2.6.25**. Spec:
+`docs/specs/M26.24-coverage.md`.
+
+### Added
+- **Coverage measurement** (`pytest-cov==7.1.0`). Config in `pyproject.toml`
+  `[tool.coverage]`: measures **application code only** (`tests/`, `.venv/`,
+  `__init__.py` omitted) — the honest **source-only baseline is 74%** (an
+  earlier ad-hoc `--cov` reported 86% only because it counted the test files
+  themselves). `fail_under = 70` is a deliberate **ratchet-down floor set below
+  74%**, not a target: the DAV/network clients are mocked but not fully
+  exercised (they'd need live servers), so their coverage swings a few points —
+  the headroom keeps honest refactors from tripping CI. Raise the floor as those
+  gaps get real tests.
+- `task coverage` (term-missing report) + `task coverage:html` (browsable
+  `htmlcov/`). CI's pytest step now runs `--cov` so the floor is enforced on
+  every push; `task ci` matches. `.coverage`/`htmlcov/` are gitignored.
+
+### Notes
+- Deliberately did **not** chase the number — coverage measures execution, not
+  correctness (the M26.18 conflict bug ran with 438 tests green). The largest
+  gaps are the DAV clients/routers (30–50%), which are network code covered at
+  their critical paths by M26.12–M26.15's targeted tests; fully exercising them
+  needs live servers and isn't worth mock-grinding here. Branch coverage
+  (`--cov-branch`) is a possible future tightening.
+
 ## [2.6.25] — Milestone 26.25 — Dependency vulnerability scanning + CVE fix
 
 Adds a dependency-audit gate **and remediates a real, measured finding**. Spec:
