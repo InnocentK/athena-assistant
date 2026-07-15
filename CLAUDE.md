@@ -160,12 +160,12 @@ frontend test harness). Full per-milestone detail is in `CHANGELOG.md`.
   + icons; registration guarded so it degrades to an ordinary page off a secure
   context (HTTPS/localhost). Polish on the remote-access path, not a replacement.
   → `docs/specs/M26.28-pwa.md`
-- **M27 — Live status & usage telemetry (epic).** Renamed from "Advanced CLI
-  live status" (the old title buried cross-surface work). **M27.0** live status
-  core (richer CLI status line; stderr; additive, not a TUI) → 2.7.0; **M27.1**
-  token/context usage on the web UI *and* athena-cli, best-effort per transport
-  off the shared M22 diagnostics trace, honest "unavailable" fallback → 2.7.1.
-  → `docs/specs/M27-live-status-and-usage.md`
+- **M27 — Live status & usage telemetry (epic).** **M27.0 *shipped* → 2.7.0**:
+  live CLI status line via a measure-only `ProviderRouter.route(on_attempt=…)`
+  callback (names the provider being tried; stderr-only, TTY-gated). **M27.1**
+  (next) token/context usage on the web UI *and* athena-cli, best-effort per
+  transport off the shared M22 diagnostics trace, honest "unavailable" fallback
+  → 2.7.1. → `docs/specs/M27-live-status-and-usage.md`
 - **M28 — Portable Profiles (epic).** Snapshot (not sync) export/import of a
   host-agnostic, secret-free identity bundle (system prompt + memory + portable
   prefs; strips credentials, endpoint URLs, file allowlists, host paths,

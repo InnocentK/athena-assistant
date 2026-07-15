@@ -4,6 +4,33 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [2.7.0] — Milestone 27.0 — Live status core (CLI)
+
+First half of the **M27 live-status & usage-telemetry epic** — **app bumped to
+2.7.0**. Spec: `docs/specs/M27-live-status-and-usage.md`. Makes the CLI's
+in-flight status line *live*: it now names the provider being tried right now
+and shows fall-through across providers, instead of a generic "Working…".
+
+### Added
+- **Router progress callback** (`ProviderRouter.route(..., on_attempt=…)`): an
+  optional, **measure-only** hook invoked with `{"provider", "transport",
+  "mode"}` immediately before each *available* provider is called. Callback
+  exceptions are swallowed — like diagnostics (M22), it can never change routing
+  or the result. Unavailable/skipped providers are not announced (we only
+  announce what's actually about to be called).
+- **Live CLI status** (`cli/status.py`): `Spinner.set_text()` updates the label
+  mid-flight (the animation loop reads it each frame), and `live_status_text()`
+  formats the callback payload ("Trying claude/cli…"). `cli/main.py` passes a
+  callback that drives the spinner. Still stderr-only and TTY-gated — piped
+  stdout stays answer-only (M25 contract intact).
+
+### Notes
+- Synchronous routing is unchanged; the callback fires at attempt boundaries,
+  which is enough for a live line without streaming (token-level streaming stays
+  future work). Tests: router callback behaviour (fires per available provider,
+  skips unavailable, a raising callback never breaks routing) + `set_text` /
+  `live_status_text` units. Gate: ruff + mypy + 452 pytest + 17 vitest.
+
 ## [2.6.28] — Milestone 26.28 — Installable PWA (web UI)
 
 User-visible frontend feature — **app bumped to 2.6.28**. Spec:

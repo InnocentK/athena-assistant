@@ -9,10 +9,12 @@ Output contract (inherited from cli/main.py): STDOUT carries only the answer.
 Everything here writes to STDERR, and the in-flight spinner only animates when
 STDERR is an interactive TTY, so piped/redirected runs stay clean.
 
-The spinner is deliberately *generic* ("Working… 1.3s"): ``ProviderRouter.route``
-is synchronous and emits its trace only at completion, so there are no
-per-attempt events to show the live provider. True live per-provider status is
-tracked as future work (streaming) and is the M27 follow-up.
+The spinner starts generic ("Working… 1.3s") and then, via the router's
+``on_attempt`` progress callback (M27.0), updates to the provider being tried
+right now ("Trying claude/cli… 1.3s"), so a fall-through across providers is
+visible live. ``ProviderRouter.route`` remains synchronous — the callback fires
+at each attempt boundary, which is enough for a live status line without a
+streaming rewrite (true token-level streaming stays future work).
 """
 
 from __future__ import annotations
@@ -62,6 +64,15 @@ class Spinner:
     def active(self) -> bool:
         """Whether this spinner will actually animate (enabled AND a TTY)."""
         return self._active
+
+    def set_text(self, text: str) -> None:
+        """
+        Update the in-flight label (M27.0 live status). The animation loop reads
+        ``self._text`` afresh each frame, so a mid-flight update (e.g. the router
+        moving to the next provider) shows on the next tick. A single attribute
+        write is atomic under the GIL, which is all a display string needs.
+        """
+        self._text = text
 
     def _frames(self) -> "itertools.cycle[str]":
         enc = ""
@@ -116,6 +127,15 @@ def _label(rec: dict[str, Any]) -> str:
     provider = rec.get("provider", "?")
     transport = rec.get("transport")
     return f"{provider}/{transport}" if transport else str(provider)
+
+
+def live_status_text(info: dict[str, Any]) -> str:
+    """
+    Spinner label for an in-flight provider attempt (M27.0), built from the
+    router's ``on_attempt`` payload (``provider``/``transport``). E.g.
+    "Trying claude/cli…". Falls back gracefully when fields are missing.
+    """
+    return f"Trying {_label(info)}…"
 
 
 def build_cli_summary(diag: dict[str, Any] | None) -> str:

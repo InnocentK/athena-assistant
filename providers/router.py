@@ -18,7 +18,7 @@ Usage:
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 from core.config import APP_ROOT
 from core.loader import load_yaml
@@ -163,9 +163,17 @@ class ProviderRouter:
         messages: "list[Message]",
         system_prompt: str | None,
         profile_config: dict[str, Any],
+        on_attempt: "Callable[[dict[str, Any]], None] | None" = None,
     ) -> "ProviderResponse":
         """
         Route a chat request to the best available provider.
+
+        ``on_attempt`` is an optional, **measure-only** progress callback (M27.0):
+        it is invoked with ``{"provider", "transport", "mode"}`` immediately
+        before each *available* provider is called, letting a caller (e.g. the
+        CLI live status line) show which provider is being tried right now.
+        Callback exceptions are swallowed — like diagnostics, it can never change
+        routing or the result.
 
         Returns a ProviderResponse. Never raises.
         """
@@ -247,6 +255,14 @@ class ProviderRouter:
             if self._log_provider_choice:
                 logger.info("Router: attempting provider '%s' (mode=%s).", name, mode)
 
+            # Live progress (M27.0): announce the provider we're about to call.
+            # Measure-only — wrapped so a bad callback can never affect routing.
+            attempt_transport = rec.transport if rec is not None else self._transport_for(name, None)
+            self._notify_attempt(
+                on_attempt,
+                {"provider": name, "transport": attempt_transport, "mode": mode},
+            )
+
             call_t0 = time.perf_counter()
             try:
                 response: "ProviderResponse" = adapter.complete(messages, system_prompt)
@@ -313,6 +329,20 @@ class ProviderRouter:
             error=all_errors,
         )
         return self._finalize_trace(trace, t_start, None, failure)
+
+    @staticmethod
+    def _notify_attempt(
+        callback: "Callable[[dict[str, Any]], None] | None",
+        info: dict[str, Any],
+    ) -> None:
+        """Fire a progress callback (M27.0), swallowing any error. Best-effort:
+        a caller's display glitch must never perturb routing."""
+        if callback is None:
+            return
+        try:
+            callback(info)
+        except Exception:  # noqa: BLE001 — progress is cosmetic; never propagate
+            pass
 
     # ------------------------------------------------------------------
     # Diagnostics helpers (Milestone 22) — measure-only; never raise

@@ -246,15 +246,24 @@ def main(argv: list[str] | None = None) -> int:
         Spinner,
         build_cli_breakdown,
         build_cli_summary,
+        live_status_text,
         stream_is_tty,
     )
 
-    # In-flight feedback: a generic spinner on stderr while route() blocks.
-    # Disabled by --quiet and automatically silent when stderr isn't a TTY.
+    # In-flight feedback: a spinner on stderr while route() blocks. Disabled by
+    # --quiet and automatically silent when stderr isn't a TTY. M27.0: the
+    # router's on_attempt callback updates the label to the provider being tried
+    # right now (e.g. "Trying claude/cli…"), so a fall-through is visible live.
     spinner = Spinner("Working…", enabled=not args.quiet)
+
+    def _on_attempt(info: dict) -> None:
+        spinner.set_text(live_status_text(info))
+
     spinner.start()
     try:
-        response = router.route(messages, system_prompt, profile_config)
+        response = router.route(
+            messages, system_prompt, profile_config, on_attempt=_on_attempt
+        )
     except Exception as exc:  # noqa: BLE001 — route() shouldn't raise, but be safe.
         spinner.stop()
         print(f"Error: provider call failed: {exc}", file=sys.stderr)

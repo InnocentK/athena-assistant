@@ -135,6 +135,64 @@ def test_router_falls_back_on_failure(router):
     assert response.provider_name == "mock_b"
 
 
+def test_router_on_attempt_fires_per_available_provider(router):
+    """M27.0: on_attempt is called (with provider + transport) before each
+    available provider is tried — including a fall-through to the next."""
+    from providers.base import Message
+
+    adapter_a = _make_mock_adapter("mock_a", success=False)
+    adapter_b = _make_mock_adapter("mock_b", success=True)
+    _setup_two_mock_adapters(router, adapter_a, adapter_b)
+
+    seen: list[dict] = []
+    profile = {"routing": {"mode": "balanced", "preferred_provider": None}}
+    response = router.route(
+        [Message(role="user", content="hi")], None, profile, on_attempt=seen.append
+    )
+
+    assert response.success is True
+    # both providers were announced, in attempt order, before being called
+    assert [i["provider"] for i in seen] == ["mock_a", "mock_b"]
+    assert all("transport" in i and "mode" in i for i in seen)
+
+
+def test_router_on_attempt_not_called_for_unavailable(router):
+    """A provider skipped as unavailable is never announced (we only announce
+    what we're about to actually call)."""
+    from providers.base import Message
+
+    adapter_a = _make_mock_adapter("mock_a", available=False)
+    adapter_b = _make_mock_adapter("mock_b", success=True)
+    _setup_two_mock_adapters(router, adapter_a, adapter_b)
+
+    seen: list[dict] = []
+    profile = {"routing": {"mode": "balanced", "preferred_provider": None}}
+    router.route([Message(role="user", content="hi")], None, profile, on_attempt=seen.append)
+
+    assert [i["provider"] for i in seen] == ["mock_b"]
+
+
+def test_router_bad_on_attempt_callback_never_breaks_routing(router):
+    """A raising callback is swallowed — routing and the result are unaffected
+    (measure-only, like diagnostics)."""
+    from providers.base import Message
+
+    adapter_a = _make_mock_adapter("mock_a", success=True)
+    adapter_b = _make_mock_adapter("mock_b", success=True)
+    _setup_two_mock_adapters(router, adapter_a, adapter_b)
+
+    def boom(_info):
+        raise RuntimeError("callback blew up")
+
+    profile = {"routing": {"mode": "balanced", "preferred_provider": None}}
+    response = router.route(
+        [Message(role="user", content="hi")], None, profile, on_attempt=boom
+    )
+
+    assert response.success is True
+    assert response.provider_name == "mock_a"
+
+
 def test_router_returns_failure_when_all_fail(router):
     """When all adapters fail, the router returns success=False."""
     from providers.base import Message

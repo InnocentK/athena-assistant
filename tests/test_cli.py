@@ -33,11 +33,15 @@ class _FakeRouter:
         self.record = record if record is not None else {}
         self.route_calls = 0
 
-    def route(self, messages, system_prompt, profile_config):
+    def route(self, messages, system_prompt, profile_config, on_attempt=None):
         self.route_calls += 1
         self.record["messages"] = messages
         self.record["system_prompt"] = system_prompt
         self.record["profile_config"] = profile_config
+        # M27.0: exercise the live-status callback seam if the CLI supplies one.
+        if on_attempt is not None:
+            self.record["on_attempt_called"] = True
+            on_attempt({"provider": "fake", "transport": "api", "mode": "balanced"})
         return self._response
 
     def list_providers(self):

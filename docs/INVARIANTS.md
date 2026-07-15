@@ -368,7 +368,14 @@ This file is the durable contract; per-release history lives in
   non-propagating `"athena"` logger — that clobbers pytest's capture handler and
   broke the whole CLI suite. Enforced by
   `test_configure_cli_logging_only_touches_tagged_handler`.
-- **CLI stdout is answer-only**; all logs/status/diagnostics go to stderr.
+- **CLI stdout is answer-only**; all logs/status/diagnostics go to stderr. The
+  M27.0 live status line (`Spinner.set_text` driven by the router's `on_attempt`
+  callback) is stderr-only and TTY-gated — do not route any of it to stdout.
+- **`route(on_attempt=…)` is measure-only (M27.0).** The progress callback fires
+  before each available provider is called and is wrapped so any exception is
+  swallowed — it must never influence routing, the attempt order, or the result
+  (same contract as the M22 diagnostics trace). Enforced by
+  `test_router_bad_on_attempt_callback_never_breaks_routing`.
 - **Packaging: declare every runtime package (M26.4).** `pyproject.toml`'s
   `[tool.setuptools] packages` is an explicit list (flat, non-`src` layout). When
   you add a new top-level package, ADD it here too, or `pip install -e .` fails

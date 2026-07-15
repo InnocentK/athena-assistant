@@ -17,6 +17,7 @@ from cli.status import (
     Spinner,
     build_cli_breakdown,
     build_cli_summary,
+    live_status_text,
     stream_is_tty,
 )
 
@@ -152,3 +153,41 @@ def test_stream_is_tty_helper():
     assert stream_is_tty(_FakeTTY(tty=True)) is True
     assert stream_is_tty(_FakeTTY(tty=False)) is False
     assert stream_is_tty(object()) is False  # no isatty() → conservative False
+
+
+# ---------------------------------------------------------------------------
+# Live status label + set_text (M27.0)
+# ---------------------------------------------------------------------------
+
+
+def test_live_status_text_with_transport():
+    assert live_status_text({"provider": "claude", "transport": "cli"}) == "Trying claude/cli…"
+
+
+def test_live_status_text_without_transport():
+    assert live_status_text({"provider": "ollama"}) == "Trying ollama…"
+
+
+def test_live_status_text_missing_provider_is_graceful():
+    # never raises on a malformed payload; falls back to "?"
+    assert live_status_text({}) == "Trying ?…"
+
+
+def test_set_text_updates_live_label_shown_by_spinner():
+    stream = _FakeTTY(tty=True)
+    sp = Spinner("Working…", enabled=True, stream=stream, interval=0.01)
+    sp.start()
+    sp.set_text("Trying grok/api…")
+    time.sleep(0.03)
+    sp.stop()
+    assert "Trying grok/api…" in stream.getvalue()
+
+
+def test_set_text_is_safe_when_inactive():
+    # disabled spinner: set_text must not raise and produces no output
+    stream = _FakeTTY(tty=True)
+    sp = Spinner("Working…", enabled=False, stream=stream)
+    sp.start()
+    sp.set_text("Trying claude/cli…")
+    sp.stop()
+    assert stream.getvalue() == ""
