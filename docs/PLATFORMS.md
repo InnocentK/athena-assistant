@@ -58,8 +58,10 @@ control *outside* Athena, using either of the safe patterns:
 
 Either way, Athena stays bound to a private interface and never to `0.0.0.0` on
 a public bridge. The security trade-offs of exposing a server are the operator's
-to manage, as with any self-hosted application. See [SECURITY.md](SECURITY.md)
-for what Athena does and does not protect.
+to manage, as with any self-hosted application. **The full how-to for both
+patterns (with verification steps and anti-patterns) is
+[REMOTE-ACCESS.md](REMOTE-ACCESS.md)**; see [SECURITY.md](SECURITY.md) for what
+Athena does and does not protect.
 
 ### PWA install requires HTTPS
 

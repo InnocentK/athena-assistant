@@ -4,6 +4,21 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [Unreleased] — Milestone 28.3 — Remote-access doc
+
+Documentation only — **no code change; the app stays at 2.8.2**. Spec:
+`docs/specs/M28.3-remote-access-doc.md`.
+
+### Added
+- **`docs/REMOTE-ACCESS.md`** — the how-to behind the platform matrix's
+  remote-access caveat: Pattern A (Tailscale/VPN, incl. `tailscale serve` for
+  tailnet HTTPS → PWA install), Pattern B (authenticated reverse proxy + TLS
+  with an illustrative Caddy snippet), an explicit anti-pattern list (no
+  `0.0.0.0` on public bridges, no direct port-forwarding, no auth shim inside
+  Athena — the no-auth design is deliberate), and bind-verification commands.
+  Linked from `docs/README.md`; `PLATFORMS.md`'s summary now points here for
+  detail (the how-to lives in exactly one place).
+
 ## [2.8.2] — Milestone 28.2 — Claude-CLI token usage (JSON envelope)
 
 The deferred M27.1 follow-up — **app bumped to 2.8.2**. Spec:

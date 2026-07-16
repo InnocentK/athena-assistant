@@ -179,10 +179,9 @@ still applies):**
   every deviation degrades to plain text. **USER TODO: validate against the
   real CLI** — `claude -p "Say hi" --output-format json` should show `result`
   + `usage` keys. → `docs/specs/M28.2-claude-cli-usage.md`
-- **M28.3 — remote-access doc** (docs only, no bump). The fuller Tailscale/VPN +
-  authenticated-reverse-proxy-TLS guidance; builds on `docs/PLATFORMS.md`
-  (which stays the canonical matrix — link, don't restate). No code; no auth
-  layer in Athena, ever (perimeter's job).
+- **M28.3 — remote-access doc** (docs only, no bump) — *shipped.*
+  `docs/REMOTE-ACCESS.md`: Tailscale/VPN + reverse-proxy-TLS how-tos,
+  anti-patterns, verification. No code; no auth layer in Athena, ever.
 - **M28.4 — profile switcher** (→ 2.8.4). Activate a different profile at
   runtime (endpoint + UI dropdown) instead of editing `ACTIVE_PROFILE` +
   restart. Completes M28: imported portable profiles become usable in-app.

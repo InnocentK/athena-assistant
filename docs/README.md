@@ -22,6 +22,7 @@ Which doc do you want?
 | [BACKUP.md](BACKUP.md) | Back up and restore |
 | [PORTABLE-PROFILES.md](PORTABLE-PROFILES.md) | Carry Athena's identity (prompt+memory) to another instance |
 | [SECURITY.md](SECURITY.md) | Understand what Athena protects and how |
+| [REMOTE-ACCESS.md](REMOTE-ACCESS.md) | Reach Athena from another machine/phone safely (Tailscale/VPN or proxy+TLS) |
 | [TASKFILE.md](TASKFILE.md) | Use the `task` command wrappers |
 
 ## Understanding / contributing to the code
