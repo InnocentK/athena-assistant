@@ -4,6 +4,30 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [2.9.6] — Milestone 29.6 — CLI history surfaces
+
+**App bumped to 2.9.6.** Spec: `docs/specs/M29.6-cli-history.md`. Closes the
+M29 asymmetry: the CLI can now read back what it writes.
+
+### Added
+- **`athena history`** — list (newest first; stdout, same answer rule as
+  `--list-providers`); **`athena history <id> [<id> …]`** — transcript(s),
+  order as given, `---` separated, failed turns marked; **`athena history
+  export <id> [<id> …]`** and **`export --all`** — Markdown to stdout
+  (redirect for one merged doc; shell-loop for separate files — the richer
+  bundling deliberately deferred, see Later/unscheduled). Errors → stderr +
+  exit 1. Routed as a pre-parser subcommand token (like `doctor`).
+- **REPL**: `/list` (recent conversations, stderr — REPL status) and
+  `/resume <id>` — loads stored turns as context (**success-only replay**,
+  M26.10) and continues appending to that same conversation.
+- **Shared renderer**: the Markdown builder moved from the HTTP router into
+  `history/manager.py::render_markdown`; the export endpoint delegates —
+  one renderer, two surfaces (test-pinned: HTTP body == store render).
+
+### Notes
+- Tests: `tests/test_history_cli.py` (7) + existing HTTP export regression.
+  Gate: ruff + mypy + 536 pytest + 22 vitest.
+
 ## [2.9.5] — Milestone 29.5 — Claude model attribution
 
 **App bumped to 2.9.5.** Spec: `docs/specs/M29.5-claude-model-attribution.md`.

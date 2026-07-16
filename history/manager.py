@@ -126,6 +126,31 @@ class ConversationStore:
             )
         return out
 
+    def render_markdown(self, conversation_id: str) -> str:
+        """
+        The conversation as a Markdown document (M29.6 — shared by the HTTP
+        export endpoint and `athena history export`; one renderer, two
+        surfaces). Raises like ``read`` (ValueError / FileNotFoundError).
+        """
+        turns = self.read(conversation_id)
+        lines = [f"# Conversation {conversation_id}", ""]
+        if turns:
+            lines += [f"Started: {turns[0].get('ts', 'unknown')}", ""]
+        for t in turns:
+            if t.get("role") == "user":
+                lines.append("## You")
+            else:
+                who = "Assistant"
+                provider = t.get("provider")
+                model = t.get("model")
+                if provider:
+                    who += f" ({provider}{'/' + model if model else ''})"
+                if t.get("success") is False:
+                    who += " *(failed)*"
+                lines.append(f"## {who}")
+            lines += ["", str(t.get("content", "")), ""]
+        return "\n".join(lines)
+
     def delete(self, conversation_id: str) -> bool:
         """Delete one conversation file. False if it didn't exist."""
         path = self._path(conversation_id)

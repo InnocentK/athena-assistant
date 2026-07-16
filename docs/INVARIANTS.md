@@ -453,6 +453,13 @@ This file is the durable contract; per-release history lives in
   full backups include it deliberately.
 - **The store is lock-guarded and per-profile** — `POST /profiles/activate`
   re-points `main._history` (test-pinned in `test_history.py`).
+- **One Markdown renderer (M29.6).** `ConversationStore.render_markdown` is
+  the only conversation-to-Markdown path — the HTTP export endpoint and
+  `athena history export` both delegate to it (test-pinned equality). Don't
+  reintroduce a second renderer.
+- **CLI history output rules (M29.6).** `athena history …` prints its answer
+  (list/transcript/Markdown) to stdout; errors/notices to stderr. Inside the
+  REPL, `/list` is status → stderr. `/resume` replays success-only (M26.10).
 
 ## Memory (M4)
 

@@ -55,7 +55,9 @@ async def history_export(conversation_id: str) -> PlainTextResponse:
     """Render the persisted turns as a downloadable Markdown document."""
     store = _store()
     try:
-        turns = await asyncio.to_thread(store.read, conversation_id)
+        # M29.6: the renderer lives on the store — one code path with
+        # `athena history export`.
+        markdown = await asyncio.to_thread(store.render_markdown, conversation_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid conversation id.") from None
     except FileNotFoundError:
@@ -63,26 +65,8 @@ async def history_export(conversation_id: str) -> PlainTextResponse:
             status_code=404, detail=f"Conversation not found: {conversation_id}"
         ) from None
 
-    lines = [f"# Conversation {conversation_id}", ""]
-    if turns:
-        lines += [f"Started: {turns[0].get('ts', 'unknown')}", ""]
-    for t in turns:
-        role = t.get("role")
-        if role == "user":
-            lines.append("## You")
-        else:
-            who = "Assistant"
-            provider = t.get("provider")
-            model = t.get("model")
-            if provider:
-                who += f" ({provider}{'/' + model if model else ''})"
-            if t.get("success") is False:
-                who += " *(failed)*"
-            lines.append(f"## {who}")
-        lines += ["", str(t.get("content", "")), ""]
-
     return PlainTextResponse(
-        "\n".join(lines),
+        markdown,
         media_type="text/markdown",
         headers={
             "Content-Disposition": f'attachment; filename="{conversation_id}.md"'

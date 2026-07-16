@@ -218,8 +218,17 @@ still applies):**
   `data/uploads/`; 📎 UI attach inserts a path reference; reads stay
   allowlist-governed. → `docs/specs/M29.3-file-uploads.md`
 - **M29.4 — conversation export** (→ 2.9.4) — *shipped.* Markdown export
-  endpoint + UI button. **The M29 Conversations epic is complete.**
-  → `docs/specs/M29.4-conversation-export.md`
+  endpoint + UI button. → `docs/specs/M29.4-conversation-export.md`
+- **M29.5 — Claude model attribution** (→ 2.9.5) — *shipped.* Model from
+  `modelUsage`'s key; tests pin the REAL 2.1.206 envelope (validated live).
+  → `docs/specs/M29.5-claude-model-attribution.md`
+- **M29.6 — CLI history surfaces** (→ 2.9.6) — *shipped.* `athena history`
+  list/show/export (variadic + `--all`), REPL `/list` + `/resume`
+  (success-only replay), shared `render_markdown` on the store. **The M29
+  Conversations epic is complete.** → `docs/specs/M29.6-cli-history.md`
+- **M29.7 — pre-3.0 review & docs sweep** (no bump) — *next, awaiting
+  go-ahead*: fresh-eyes review of M28.2–M29.6, doc-drift fixes (spec index,
+  ARCHITECTURE tree), README/INSTALLATION refresh, coverage-floor decision.
 
 *M30 — Streaming (epic, → 3.0.0).* SSE per-provider streaming for API
 transports; streamed rendering in the web UI; streamed stdout in the CLI. CLI

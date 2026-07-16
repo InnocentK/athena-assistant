@@ -22,7 +22,10 @@ from __future__ import annotations
 import sys
 from typing import Any
 
-_HELP = "Commands: /new (fresh conversation), /exit or /quit (leave). Ctrl-D exits."
+_HELP = (
+    "Commands: /new (fresh conversation), /list (recent conversations), "
+    "/resume <id> (continue one), /exit or /quit (leave). Ctrl-D exits."
+)
 
 
 def run_repl(router: Any, profile_config: dict[str, Any], args: Any) -> int:
@@ -92,6 +95,44 @@ def run_repl(router: Any, profile_config: dict[str, Any], args: Any) -> int:
                 except Exception:  # noqa: BLE001
                     conv_id = None
             print("(new conversation)", file=sys.stderr)
+            continue
+        if text == "/list":
+            # REPL status, not an answer → stderr (M29.6).
+            if store is None:
+                print("(history unavailable)", file=sys.stderr)
+                continue
+            conversations = store.list_conversations()[:10]
+            if not conversations:
+                print("(no conversations yet)", file=sys.stderr)
+            for c in conversations:
+                print(
+                    f"  {c['id']}  {c['turns']} turns  {c['preview']}",
+                    file=sys.stderr,
+                )
+            continue
+        if text.startswith("/resume"):
+            parts = text.split(None, 1)
+            target = parts[1].strip() if len(parts) > 1 else ""
+            if store is None or not target:
+                print("Usage: /resume <id>  (see /list)", file=sys.stderr)
+                continue
+            try:
+                turns = store.read(target)
+            except (ValueError, FileNotFoundError):
+                print(f"(no such conversation: {target})", file=sys.stderr)
+                continue
+            # Success-only replay (M26.10): failed turns never re-enter context.
+            history = [
+                (t["role"], str(t.get("content", "")))
+                for t in turns
+                if t.get("role") in ("user", "assistant")
+                and not (t.get("role") == "assistant" and t.get("success") is False)
+            ]
+            conv_id = target
+            print(
+                f"(resumed {target}: {len(history)} turns in context)",
+                file=sys.stderr,
+            )
             continue
         if text.startswith("/"):
             print(_HELP, file=sys.stderr)

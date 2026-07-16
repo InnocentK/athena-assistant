@@ -175,6 +175,14 @@ def main(argv: list[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
     argv = _normalize_argv(argv)
+
+    # M29.6: `athena history …` is a true subcommand with its own arguments —
+    # route it before the main parser (which would choke on its ids).
+    if argv and argv[0] == "history":
+        from cli.history_cmd import run_history  # noqa: PLC0415
+
+        return run_history(argv[1:])
+
     args = parser.parse_args(argv)
 
     # M28.6: doctor runs before any profile/router init and exits with its code.
