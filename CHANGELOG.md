@@ -4,6 +4,29 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [2.9.5] — Milestone 29.5 — Claude model attribution
+
+**App bumped to 2.9.5.** Spec: `docs/specs/M29.5-claude-model-attribution.md`.
+Born from validating M28.2 against the **real** Claude CLI (2.1.206, run
+live): the production envelope has no top-level `model` key — the model name
+is the key of the `modelUsage` object.
+
+### Changed
+- `providers/claude.py`: when the envelope carries no top-level `model`, the
+  name is attributed from `modelUsage`'s first key (best-effort: non-empty
+  dict with a string key, else `None` — the M28.2 degradation contract
+  unchanged). Claude turns now show their model in diagnostics, status lines,
+  and history meta like every other provider.
+- **Tests now pin the real 2.1.206 envelope** (structurally faithful fixture
+  incl. `total_cost_usd`, cache-token fields, `iterations`, `session_id`) —
+  the parser is proven against production shape, not a guess: content, usage
+  mapping (5954/14/5968), `model == "claude-sonnet-5"`, top-level `model`
+  precedence, and modelUsage edge cases.
+
+### Notes
+- Gate: ruff + mypy + 529 pytest + 22 vitest. Out of scope (unchanged
+  decisions): cost fields, cache-token accounting.
+
 ## [2.9.4] — Milestone 29.4 — Conversation export
 
 **App bumped to 2.9.4 — the M29 Conversations epic is complete.** Spec:

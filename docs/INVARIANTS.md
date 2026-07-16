@@ -290,7 +290,11 @@ This file is the durable contract; per-release history lives in
   envelope deviation (non-JSON stdout, missing `result`, probe failure) falls
   back to plain-text success, and `is_error: true` maps to a provider failure.
   Do not make JSON parsing strict — an envelope change in a future CLI must
-  degrade the metric, never the answer. Tests: `tests/test_claude_usage.py`.
+  degrade the metric, never the answer. Model attribution (M29.5) is the same
+  contract: top-level `model`, else `modelUsage`'s first key, else `None` —
+  never a guess. The test fixture pins the REAL 2.1.206 envelope; when a new
+  CLI version changes the shape, update the fixture from a live capture.
+  Tests: `tests/test_claude_usage.py`.
 - **Token usage is counts-only (M27.1).** Adapters may put a `usage` dict of
   token *counts* into `response.metadata["usage"]` (API adapters via
   `extract_openai_usage`); the router copies it to `ProviderCallRecord.usage`.

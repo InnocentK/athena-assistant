@@ -29,6 +29,39 @@ ENVELOPE = {
     "usage": {"input_tokens": 12, "output_tokens": 5},
 }
 
+# Structurally faithful to the REAL envelope captured from Claude Code 2.1.206
+# (M29.5 validation run): no top-level "model"; the name is modelUsage's key;
+# extra fields present to prove the parser tolerates them.
+REAL_ENVELOPE_2_1_206 = {
+    "type": "result",
+    "subtype": "success",
+    "is_error": False,
+    "duration_ms": 3636,
+    "num_turns": 1,
+    "result": "Hi! What can I help you with today?",
+    "stop_reason": "end_turn",
+    "session_id": "ee6a69b8-afe3-5973-9ac4-1c08eb032335",
+    "total_cost_usd": 0.182322,
+    "usage": {
+        "input_tokens": 5954,
+        "cache_creation_input_tokens": 27375,
+        "cache_read_input_tokens": 0,
+        "output_tokens": 14,
+        "service_tier": "standard",
+        "iterations": [{"input_tokens": 5954, "output_tokens": 14, "type": "message"}],
+    },
+    "modelUsage": {
+        "claude-sonnet-5": {
+            "inputTokens": 5954,
+            "outputTokens": 14,
+            "costUSD": 0.182322,
+            "contextWindow": 1000000,
+        }
+    },
+    "permission_denials": [],
+    "uuid": "b5c3342d-9c59-489a-99b4-63388c452aa1",
+}
+
 
 def _runner(help_result, complete_result, calls):
     """Fake subprocess.run recording argv."""
@@ -61,6 +94,36 @@ def test_json_mode_parses_content_model_and_usage(monkeypatch):
         "prompt_tokens": 12, "completion_tokens": 5, "total_tokens": 17,
     }
     assert calls[-1][-2:] == ["--output-format", "json"]
+
+
+def test_real_2_1_206_envelope_parses_with_model_attribution(monkeypatch):
+    """The pinned real-world envelope (M29.5): content + usage + model from
+    modelUsage's key, with all the extra fields tolerated."""
+    ok = SimpleNamespace(returncode=0, stdout=json.dumps(REAL_ENVELOPE_2_1_206), stderr="")
+    _, resp, _ = _complete(monkeypatch, HELP_WITH_FLAG, ok)
+    assert resp.success and resp.content == "Hi! What can I help you with today?"
+    assert resp.model == "claude-sonnet-5"          # attributed via modelUsage
+    assert resp.metadata["usage"] == {
+        "prompt_tokens": 5954, "completion_tokens": 14, "total_tokens": 5968,
+    }
+
+
+def test_top_level_model_wins_over_model_usage(monkeypatch):
+    env = dict(REAL_ENVELOPE_2_1_206, model="claude-explicit")
+    ok = SimpleNamespace(returncode=0, stdout=json.dumps(env), stderr="")
+    _, resp, _ = _complete(monkeypatch, HELP_WITH_FLAG, ok)
+    assert resp.model == "claude-explicit"
+
+
+def test_model_usage_edge_cases_yield_none(monkeypatch):
+    # (JSON object keys are always strings, so a non-str key can't occur on
+    # the wire — the isinstance guard covers hand-constructed dicts only.)
+    for bad in ({}, "not a dict", None, 42):
+        env = {k: v for k, v in REAL_ENVELOPE_2_1_206.items() if k != "modelUsage"}
+        env["modelUsage"] = bad
+        ok = SimpleNamespace(returncode=0, stdout=json.dumps(env), stderr="")
+        _, resp, _ = _complete(monkeypatch, HELP_WITH_FLAG, ok)
+        assert resp.success and resp.model is None
 
 
 def test_no_flag_support_means_plain_invocation(monkeypatch):

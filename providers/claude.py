@@ -192,6 +192,14 @@ class ClaudeAdapter(ProviderAdapter):
             )
         usage = _map_claude_usage(data.get("usage"))
         model = data.get("model") if isinstance(data.get("model"), str) else None
+        if model is None:
+            # M29.5: the real CLI envelope (validated against 2.1.206) has no
+            # top-level "model" — the name is the key of the modelUsage object.
+            # Best-effort: non-empty dict with a string first key, else None.
+            model_usage = data.get("modelUsage")
+            if isinstance(model_usage, dict) and model_usage:
+                first = next(iter(model_usage))
+                model = first if isinstance(first, str) else None
         return ProviderResponse(
             content=content.strip(),
             provider_name="claude",
