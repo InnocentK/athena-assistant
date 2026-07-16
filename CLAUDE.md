@@ -213,8 +213,10 @@ still applies):**
   multi-turn session (`cli/repl.py`): success-only history replay, per-turn
   live status/usage, persisted to the M29.1 store, `/new` `/exit`. Non-TTY
   bare invocation stays exit-2. → `docs/specs/M29.2-cli-repl.md`
-- **M29.3 — real file uploads.** Attach a file to a turn; policed by the
-  existing files allowlist.
+- **M29.3 — real file uploads** (→ 2.9.3) — *shipped.* `POST /files/upload`
+  (sanitized names, streamed 10 MB cap, unique suffixes) into the allowlisted
+  `data/uploads/`; 📎 UI attach inserts a path reference; reads stay
+  allowlist-governed. → `docs/specs/M29.3-file-uploads.md`
 - **M29.4 — conversation export.** Markdown export of a conversation
   (depends on M29.1).
 

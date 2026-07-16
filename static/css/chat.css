@@ -320,6 +320,22 @@ body {
   cursor: not-allowed;
 }
 
+/* Attach button (M29.3) — quiet sibling of the send button. */
+#attach-btn {
+  flex: 0 0 auto;
+  background-color: var(--color-bg-badge);
+  color: var(--color-text-badge);
+  border: 1px solid var(--color-border-badge);
+  border-radius: 4px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+#attach-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 #send-btn {
   flex: 0 0 auto;
   background-color: var(--color-bg-btn);

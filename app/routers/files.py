@@ -11,9 +11,12 @@ stale module across the test suite's per-test main re-import).
 from __future__ import annotations
 
 import asyncio
+import re
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, UploadFile
+
+from core.config import APP_ROOT
 
 
 from app.models import (
@@ -170,3 +173,110 @@ async def files_write(body: FileWriteRequest) -> dict[str, Any]:
             detail={"path": body.path, "error": str(exc)},
         )
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+# ---------------------------------------------------------------------------
+# Uploads (M29.3) — plain files under data/uploads/, read via the allowlist
+# ---------------------------------------------------------------------------
+
+_UPLOAD_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+_UPLOAD_SAFE_CHAR = re.compile(r"[^A-Za-z0-9._-]")
+
+
+def _uploads_dir():
+    return APP_ROOT / "data" / "uploads"
+
+
+def _sanitize_upload_name(raw: str | None) -> str:
+    """Basename only; unsafe chars -> _; no dotfiles; never empty."""
+    name = (raw or "").replace("\\", "/").rsplit("/", 1)[-1]
+    name = _UPLOAD_SAFE_CHAR.sub("_", name).lstrip(".")
+    return name or "upload"
+
+
+def _unique_path(name: str):
+    """data/uploads/<name>, suffixed -1, -2, ... on collision (never overwrite)."""
+    base = _uploads_dir()
+    candidate = base / name
+    if not candidate.exists():
+        return candidate
+    stem, dot, ext = name.partition(".")
+    for i in range(1, 1000):
+        candidate = base / (f"{stem}-{i}{dot}{ext}" if dot else f"{stem}-{i}")
+        if not candidate.exists():
+            return candidate
+    raise HTTPException(status_code=409, detail="Too many files with this name.")
+
+
+@router.post("/files/upload", summary="Upload a file to data/uploads/ (M29.3)")
+async def files_upload(file: UploadFile) -> dict[str, Any]:
+    """
+    Save an uploaded file under data/uploads/ (allowlisted read/write in the
+    shipped config, so the existing /files/read machinery serves it).
+
+    The name is fully sanitized server-side; content is opaque bytes (never
+    executed or parsed); 10 MB cap enforced while streaming (partial file
+    removed on breach); collisions get a unique suffix.
+    """
+    name = _sanitize_upload_name(file.filename)
+
+    def _save() -> dict[str, Any]:
+        _uploads_dir().mkdir(parents=True, exist_ok=True)
+        target = _unique_path(name)
+        written = 0
+        try:
+            with open(target, "wb") as fh:
+                while True:
+                    chunk = file.file.read(64 * 1024)
+                    if not chunk:
+                        break
+                    written += len(chunk)
+                    if written > _UPLOAD_MAX_BYTES:
+                        raise HTTPException(
+                            status_code=413,
+                            detail=f"File too large (max {_UPLOAD_MAX_BYTES // (1024 * 1024)} MB).",
+                        )
+                    fh.write(chunk)
+        except HTTPException:
+            target.unlink(missing_ok=True)  # no partial files on breach
+            raise
+        if written == 0:
+            target.unlink(missing_ok=True)
+            raise HTTPException(status_code=400, detail="Empty upload.")
+        return {
+            "uploaded": True,
+            "name": target.name,
+            "path": f"data/uploads/{target.name}",
+            "bytes": written,
+        }
+
+    result = await asyncio.to_thread(_save)
+    main.write_ops_event(
+        event="file_upload",
+        outcome="success",
+        detail={"name": result["name"], "bytes": result["bytes"]},
+    )
+    return result
+
+
+@router.get("/files/uploads", summary="List uploaded files (M29.3)")
+async def files_uploads_list() -> list[dict[str, Any]]:
+    """Uploads newest-first: name, relative path, size, mtime."""
+
+    def _list() -> list[dict[str, Any]]:
+        base = _uploads_dir()
+        if not base.exists():
+            return []
+        entries = [
+            {
+                "name": p.name,
+                "path": f"data/uploads/{p.name}",
+                "bytes": p.stat().st_size,
+                "mtime": p.stat().st_mtime,
+            }
+            for p in base.iterdir()
+            if p.is_file()
+        ]
+        return sorted(entries, key=lambda e: e["mtime"], reverse=True)
+
+    return await asyncio.to_thread(_list)

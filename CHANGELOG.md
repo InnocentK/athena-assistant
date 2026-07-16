@@ -4,6 +4,30 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [2.9.3] — Milestone 29.3 — Real file uploads
+
+**App bumped to 2.9.3.** Spec: `docs/specs/M29.3-file-uploads.md`.
+
+### Added
+- **`POST /files/upload`** (multipart): saves to `data/uploads/` — which the
+  shipped allowlist already covers read/write, so uploads are immediately
+  readable/searchable through the **existing guarded file machinery** (no new
+  read path, no prompt auto-injection). Server-side name sanitization
+  (basename only, `[A-Za-z0-9._-]`, no dotfiles), **10 MB cap enforced while
+  streaming** (partial file removed on breach → 413), empty → 400, collisions
+  get `-1`/`-2` suffixes (never overwrite). Content is opaque bytes. Ops-
+  audited (name + size only).
+- **`GET /files/uploads`** — newest-first listing.
+- **UI**: 📎 attach button beside the input — uploads and inserts
+  `[Attached file: data/uploads/<name>]` into the message box; the user stays
+  in control of what's asked about the file.
+
+### Notes
+- Tests: `tests/test_uploads.py` (6) — allowlist round-trip via `/files/read`,
+  traversal name lands sanitized *inside* the uploads dir, dotfile/weird
+  chars cleaned, unique suffixing, oversize leaves nothing behind, empty
+  rejected. Gate: ruff + mypy + 524 pytest + 22 vitest.
+
 ## [2.9.2] — Milestone 29.2 — CLI REPL
 
 **App bumped to 2.9.2.** Spec: `docs/specs/M29.2-cli-repl.md`.

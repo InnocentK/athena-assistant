@@ -425,6 +425,17 @@ This file is the durable contract; per-release history lives in
   editable set or switch away from in-place mutation without revisiting the
   persistence/runtime/CLI interactions.
 
+## File uploads (M29.3)
+
+- **The upload endpoint fully controls the target path**: basename-only
+  sanitization to `[A-Za-z0-9._-]` (no dotfiles, never empty) into
+  `data/uploads/` only, unique-suffix on collision — never trust the client
+  filename, never overwrite.
+- **The 10 MB cap is enforced during the streamed write** (partial file
+  removed on breach) — do not switch to read-then-check.
+- **Reads stay allowlist-governed.** Uploads add no read path; do not
+  auto-inject file contents into prompts.
+
 ## Conversation history (M29.1)
 
 - **Ids are validated before any path is built.** `ConversationStore._path`

@@ -98,6 +98,39 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Wire events
   sendBtn.addEventListener("click", sendMessage);
+
+  // M29.3: file attach — upload to data/uploads/ and reference it in the input.
+  const attachBtn = document.getElementById("attach-btn");
+  const attachInput = document.getElementById("attach-input");
+  if (attachBtn && attachInput) {
+    attachBtn.addEventListener("click", function () {
+      attachInput.click();
+    });
+    attachInput.addEventListener("change", async function () {
+      const file = attachInput.files && attachInput.files[0];
+      attachInput.value = ""; // allow re-picking the same file
+      if (!file) return;
+      attachBtn.disabled = true;
+      try {
+        const form = new FormData();
+        form.append("file", file);
+        const res = await fetch("/files/upload", { method: "POST", body: form });
+        if (!res.ok) {
+          const err = await res.json().catch(function () { return {}; });
+          appendMessage("error", "Upload failed: " + (err.detail || res.status), null, null);
+          return;
+        }
+        const data = await res.json();
+        const ref = "[Attached file: " + data.path + "]\n";
+        messageInput.value = ref + messageInput.value;
+        messageInput.focus();
+      } catch (_) {
+        appendMessage("error", "Upload failed: network error", null, null);
+      } finally {
+        attachBtn.disabled = false;
+      }
+    });
+  }
   messageInput.addEventListener("keydown", handleInputKeydown);
   messageInput.addEventListener("input", autoResizeTextarea);
 
