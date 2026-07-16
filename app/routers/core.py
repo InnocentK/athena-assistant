@@ -253,13 +253,14 @@ async def chat(request: ChatRequest) -> ChatResponse:
             detail="ProviderRouter is not available. Check startup logs.",
         )
 
-    # Build the full message list from history + the new user message
-    messages: list[Message] = [
-        Message(role=m.role, content=m.content) for m in request.history
-    ]
-    messages.append(Message(role="user", content=request.message))
+    # Build the full message list from history + the new user message via the
+    # shared turn helper (M29.0) — one assembly path with the CLI.
+    from core.chat_turn import build_turn_messages, system_prompt_from  # noqa: PLC0415
 
-    system_prompt: str | None = main._profile_data.get("system_prompt") or None
+    messages: list[Message] = build_turn_messages(
+        ((m.role, m.content) for m in request.history), request.message
+    )
+    system_prompt: str | None = system_prompt_from(main._profile_data)
 
     # M26.5: route() is synchronous (subprocess/network); run it in a worker
     # thread so the event loop stays responsive, with a bounded request time.
@@ -285,18 +286,19 @@ async def chat(request: ChatRequest) -> ChatResponse:
             diagnostics=None,
         )
 
-    # Fire-and-forget auto-extraction (fast pattern matching only). Wrapped so a
-    # slow YAML write can neither block the loop nor fail an answered chat.
+    # Fire-and-forget auto-extraction via the shared sync core (M29.0), still
+    # wrapped here so a slow YAML write can neither block the loop nor fail an
+    # answered chat (extract_memory itself swallows non-timeout errors).
     if main._memory is not None:
+        from core.chat_turn import extract_memory  # noqa: PLC0415
+
         try:
             await asyncio.wait_for(
-                asyncio.to_thread(main._memory.auto_extract, request.message, response.content),
+                asyncio.to_thread(extract_memory, main._memory, request.message, response.content),
                 timeout=main._AUTO_EXTRACT_TIMEOUT,
             )
         except asyncio.TimeoutError:
             logger.warning("auto_extract timed out after %ss (non-fatal)", main._AUTO_EXTRACT_TIMEOUT)
-        except Exception as exc:  # noqa: BLE001
-            logger.error("auto_extract raised an unexpected error: %s", exc)
 
     return ChatResponse(
         response=response.content,

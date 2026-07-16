@@ -97,6 +97,7 @@ app/models.py               Pydantic request/response models (M26.18)
 app/routers/<domain>.py     one APIRouter per domain (M26.18) — handlers reach
                             main state via `main.` after `import main`
 core/{config,loader,logger} APP_ROOT/Settings, YAML I/O, logging
+core/chat_turn.py           shared turn assembly + memory-extract core (M29.0)
 core/version.py             __version__ — the single bump site
 core/urlguard.py            DAV same-origin guard (M26.13)
 providers/                  router.py + adapters (claude/gemini/chatgpt/grok/ollama/hermes/chatgpt_cli)
@@ -198,9 +199,10 @@ still applies):**
 
 *M29 — Conversations (epic, 2.9.x) — in dependency order:*
 
-- **M29.0 — shared chat-turn helper.** ONE code path assembling a turn
-  (history, system prompt, memory extraction) used by both the web `/chat`
-  handler and the CLI. Prerequisite for everything below.
+- **M29.0 — shared chat-turn helper** (→ 2.9.0) — *shipped.*
+  `core/chat_turn.py` (`build_turn_messages` / `system_prompt_from` /
+  `extract_memory`); both surfaces rewired, execution models untouched.
+  → `docs/specs/M29.0-chat-turn-helper.md`
 - **M29.1 — persistent cross-session history.** Conversations survive restarts
   as plain local files. Chat history stays OUT of portable bundles (M28
   striplist — already an invariant).

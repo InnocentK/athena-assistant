@@ -199,7 +199,6 @@ def main(argv: list[str] | None = None) -> int:
     try:
         from core.config import active_profile_dir, get_settings
         from core.loader import load_yaml
-        from providers.base import Message
         from providers.router import ProviderRouter
     except Exception as exc:  # noqa: BLE001
         print(f"Error: failed to load Athena modules: {exc}", file=sys.stderr)
@@ -255,9 +254,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.provider:
         routing["preferred_provider"] = args.provider
 
-    # One-shot: a single user turn, system prompt from the profile.
-    messages = [Message(role="user", content=args.prompt)]
-    system_prompt = profile_config.get("system_prompt") or None
+    # One-shot: a single user turn, system prompt from the profile — assembled
+    # via the shared turn helper (M29.0), one code path with /chat.
+    from core.chat_turn import build_turn_messages, system_prompt_from  # noqa: PLC0415
+
+    messages = build_turn_messages([], args.prompt)
+    system_prompt = system_prompt_from(profile_config)
 
     from cli.status import (
         Spinner,
@@ -319,18 +321,23 @@ def main(argv: list[str] | None = None) -> int:
             if breakdown:
                 print(breakdown, file=sys.stderr)
 
-    # Best-effort, non-fatal memory auto-extraction (mirrors the /chat handler).
+    # Best-effort, non-fatal memory auto-extraction via the shared sync core
+    # (M29.0) — identical semantics to the /chat handler. Manager construction
+    # can itself fail; that too must never fail an answered prompt.
     if not args.no_memory:
+        from core.chat_turn import extract_memory  # noqa: PLC0415
+
         try:
             from memory.manager import MemoryManager
 
             memory = MemoryManager(active_profile_dir(), profile_config)
-            memory.auto_extract(args.prompt, response.content)
         except Exception as exc:  # noqa: BLE001 — never fail an answered prompt.
             import logging
 
             logging.getLogger("athena").warning(
-                "auto_extract failed (non-fatal): %s", exc
+                "auto_extract setup failed (non-fatal): %s", exc
             )
+            memory = None
+        extract_memory(memory, args.prompt, response.content)
 
     return 0

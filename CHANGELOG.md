@@ -4,6 +4,32 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [2.9.0] — Milestone 29.0 — Shared chat-turn helper
+
+**App bumped to 2.9.0 — the M29 Conversations epic begins.** Spec:
+`docs/specs/M29.0-chat-turn-helper.md`. Behavior-neutral refactor: ONE code
+path assembling a chat turn for both the web `/chat` handler and the CLI, so
+persistent history (M29.1) and streaming (M30) get built once.
+
+### Added
+- **`core/chat_turn.py`**: `build_turn_messages` (history pairs + new user
+  message), `system_prompt_from` (the exact `or None` semantics), and
+  `extract_memory` (the sync auto-extraction core — None-tolerant, swallows
+  every exception, logged). FastAPI-free.
+
+### Changed
+- `/chat` and the CLI now assemble turns through the helpers. The surfaces'
+  execution models are deliberately unchanged: HTTP keeps its
+  `wait_for(to_thread(...))` + `_ROUTE_TIMEOUT`/`_AUTO_EXTRACT_TIMEOUT`
+  wrappers; the CLI keeps the spinner + `on_attempt` live status. CLI bonus:
+  a MemoryManager *construction* failure is now also non-fatal (previously
+  only extraction was guarded).
+
+### Notes
+- Tests: `tests/test_chat_turn.py` (5 units); the full suite is the
+  regression net for the rewiring. Gate: ruff + mypy + 506 pytest + 21
+  vitest.
+
 ## [2.8.6] — Milestone 28.6 — `athena doctor` (preflight diagnostics)
 
 **App bumped to 2.8.6.** Spec: `docs/specs/M28.6-doctor.md`. The executable
