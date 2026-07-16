@@ -28,10 +28,16 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+from typing import Any
 
 from core.config import APP_ROOT
 from core.loader import load_yaml
-from providers.base import Message, ProviderAdapter, ProviderResponse
+from providers.base import (
+    Message,
+    ProviderAdapter,
+    ProviderResponse,
+    extract_openai_usage,
+)
 
 # ---------------------------------------------------------------------------
 # Defaults / constants
@@ -216,7 +222,7 @@ class GrokAdapter(ProviderAdapter):
     def _complete_api(
         self, messages: list[Message], system_prompt: str | None
     ) -> ProviderResponse:
-        meta = {"transport": "api"}
+        meta: dict[str, Any] = {"transport": "api"}
 
         try:
             import openai  # noqa: PLC0415
@@ -253,6 +259,9 @@ class GrokAdapter(ProviderAdapter):
                 model=model, messages=api_messages,  # type: ignore[arg-type]
             )
             content = response.choices[0].message.content or ""
+            usage = extract_openai_usage(response)
+            if usage:
+                meta["usage"] = usage
             return ProviderResponse(
                 content=content, provider_name="grok", model=model,
                 success=True, metadata=meta,

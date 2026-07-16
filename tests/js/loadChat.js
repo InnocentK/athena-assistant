@@ -24,6 +24,7 @@ const SHIM = `
 ;window.voice = voice;
 ;window.__chat = {
   buildDiagnosticsSummary,
+  buildUsageText,
   buildTimeline,
   buildDetails,
   appendMessage,

@@ -4,6 +4,44 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [2.7.1] — Milestone 27.1 — Token / context usage surfaces
+
+Second half of the **M27 epic** — **app bumped to 2.7.1**. Spec:
+`docs/specs/M27-live-status-and-usage.md`. Surfaces per-response token usage of
+the selected provider in both the web UI and athena-cli, off the shared M22
+diagnostics trace.
+
+### Added
+- **Content-free `usage` on the diagnostics record** (`ProviderCallRecord.usage`):
+  optional token *counts* (`prompt`/`completion`/`total`), or `None`
+  ("unavailable"). Counts are metadata — the "diagnostics store no content" rule
+  still holds (never token text).
+- **Best-effort capture for API transports** (`extract_openai_usage` in
+  `providers/base.py`): chatgpt, grok (api path), and ollama read the OpenAI-SDK
+  `usage` object into `metadata["usage"]`; the router copies it onto the record.
+  The extractor is defensive — a missing/mangled `usage` yields `None`, never an
+  exception (and a stray `bool` is not mistaken for a count).
+- **Web UI** (`buildUsageText` in `static/js/chat.js`): a quiet token line under
+  the answer ("Tokens: 1,204 prompt + 320 completion = 1,524 total" / "Tokens:
+  unavailable"), rendered with `textContent` (counts only, no XSS).
+- **CLI** (`build_cli_usage` in `cli/status.py`): the same line on **stderr**
+  alongside the status summary — stdout stays answer-only (M25/M27.0 contract).
+
+### Deferred (deliberate, flagged)
+- **Claude-CLI usage via `--output-format json` is NOT in this release.** Capturing
+  it means switching the Claude invocation to a JSON envelope and re-parsing its
+  output — a change to the primary provider's output path that can't be validated
+  against the real CLI from the fully-mocked suite. Rather than risk breaking a
+  working `claude` for a best-effort metric, CLI transports (incl. Claude) report
+  "unavailable" here; the Claude-JSON path is a separate follow-up to be developed
+  against a real CLI with proper fallback. API transports are fully covered.
+
+### Notes
+- Tests: `tests/test_token_usage.py` (extractor incl. bool/partial edge cases,
+  router copies usage onto the record / `None` when absent, `build_cli_usage`
+  full + unavailable + partial) and `tests/js/usage.test.js` (`buildUsageText`).
+  Gate: ruff + mypy + 462 pytest + 21 vitest.
+
 ## [2.7.0] — Milestone 27.0 — Live status core (CLI)
 
 First half of the **M27 live-status & usage-telemetry epic** — **app bumped to

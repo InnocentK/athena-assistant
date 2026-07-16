@@ -175,6 +175,41 @@ def build_cli_summary(diag: dict[str, Any] | None) -> str:
     return core[0].upper() + core[1:]
 
 
+def build_cli_usage(diag: dict[str, Any] | None) -> str:
+    """
+    One-line token-usage summary for the *selected* provider (M27.1), for STDERR:
+
+        "Tokens: 1,204 prompt + 320 completion = 1,524 total"
+        "Tokens: unavailable"   (CLI transports / providers that don't report)
+
+    Returns "" when there is no usable trace. Content-free — counts only.
+    """
+    if not isinstance(diag, dict):
+        return ""
+    records = diag.get("records")
+    selected = diag.get("selected")
+    if not isinstance(records, list) or not selected:
+        return ""
+
+    sel_rec = next((r for r in records if r.get("provider") == selected), None)
+    usage = sel_rec.get("usage") if isinstance(sel_rec, dict) else None
+    if not isinstance(usage, dict) or not usage:
+        return "Tokens: unavailable"
+
+    parts = []
+    prompt = usage.get("prompt_tokens")
+    completion = usage.get("completion_tokens")
+    total = usage.get("total_tokens")
+    if isinstance(prompt, int):
+        parts.append(f"{prompt:,} prompt")
+    if isinstance(completion, int):
+        parts.append(f"{completion:,} completion")
+    body = " + ".join(parts)
+    if isinstance(total, int):
+        body = (f"{body} = " if body else "") + f"{total:,} total"
+    return f"Tokens: {body}" if body else "Tokens: unavailable"
+
+
 def build_cli_breakdown(diag: dict[str, Any] | None) -> str:
     """
     Multi-line, parseable per-attempt breakdown for ``--diagnostics`` (STDERR).

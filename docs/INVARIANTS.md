@@ -285,8 +285,15 @@ This file is the durable contract; per-release history lives in
   `transport()` on non-answer records; keep it in sync with `list_providers()`.
   A new dynamic-transport adapter should expose a `transport()` method.
   Availability is config-based (no network probe).
+- **Token usage is counts-only (M27.1).** Adapters may put a `usage` dict of
+  token *counts* into `response.metadata["usage"]` (API adapters via
+  `extract_openai_usage`); the router copies it to `ProviderCallRecord.usage`.
+  This is metadata, not content — **never** put prompt/response text in `usage`,
+  or the "diagnostics store no content" rule breaks. Missing usage is `None`
+  ("unavailable"), surfaced honestly by the UI (`buildUsageText`) and CLI
+  (`build_cli_usage`) — never a fabricated number.
 - Tests: `tests/test_provider_robustness.py`, `tests/test_provider_*`,
-  `tests/test_diagnostics.py`.
+  `tests/test_diagnostics.py`, `tests/test_token_usage.py`.
 
 ## Calendar / DAV (M26.9)
 

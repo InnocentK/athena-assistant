@@ -14,7 +14,12 @@ from __future__ import annotations
 
 import os
 
-from providers.base import Message, ProviderAdapter, ProviderResponse
+from providers.base import (
+    Message,
+    ProviderAdapter,
+    ProviderResponse,
+    extract_openai_usage,
+)
 
 DEFAULT_API_TIMEOUT: float = 120.0  # seconds — matches the Grok/CLI timeout convention
 
@@ -83,11 +88,13 @@ class ChatGPTAPIAdapter(ProviderAdapter):
             )
 
             content = response.choices[0].message.content or ""
+            usage = extract_openai_usage(response)
             return ProviderResponse(
                 content=content,
                 provider_name="chatgpt",
                 model="gpt-4o",
                 success=True,
+                metadata={"usage": usage} if usage else {},
             )
 
         except openai.APITimeoutError:

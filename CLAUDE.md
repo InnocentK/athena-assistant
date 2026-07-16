@@ -162,10 +162,12 @@ frontend test harness). Full per-milestone detail is in `CHANGELOG.md`.
   → `docs/specs/M26.28-pwa.md`
 - **M27 — Live status & usage telemetry (epic).** **M27.0 *shipped* → 2.7.0**:
   live CLI status line via a measure-only `ProviderRouter.route(on_attempt=…)`
-  callback (names the provider being tried; stderr-only, TTY-gated). **M27.1**
-  (next) token/context usage on the web UI *and* athena-cli, best-effort per
-  transport off the shared M22 diagnostics trace, honest "unavailable" fallback
-  → 2.7.1. → `docs/specs/M27-live-status-and-usage.md`
+  callback. **M27.1 *shipped* → 2.7.1**: token usage on the web UI
+  (`buildUsageText`) *and* athena-cli (`build_cli_usage`), content-free counts on
+  `ProviderCallRecord.usage`, captured for API transports (`extract_openai_usage`).
+  *Deferred follow-up:* Claude-CLI usage via `--output-format json` (changes the
+  primary provider's output path; can't be validated from the mocked suite — CLI
+  transports report "unavailable" for now). → `docs/specs/M27-live-status-and-usage.md`
 - **M28 — Portable Profiles (epic).** Snapshot (not sync) export/import of a
   host-agnostic, secret-free identity bundle (system prompt + memory + portable
   prefs; strips credentials, endpoint URLs, file allowlists, host paths,

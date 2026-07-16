@@ -246,6 +246,7 @@ def main(argv: list[str] | None = None) -> int:
         Spinner,
         build_cli_breakdown,
         build_cli_summary,
+        build_cli_usage,
         live_status_text,
         stream_is_tty,
     )
@@ -291,6 +292,11 @@ def main(argv: list[str] | None = None) -> int:
         summary = build_cli_summary(diagnostics)
         if summary and (stream_is_tty(sys.stderr) or args.diagnostics):
             print(summary, file=sys.stderr)
+            # Token usage for the selected provider (M27.1): shown alongside the
+            # summary. "Tokens: unavailable" for CLI transports that can't report.
+            usage_line = build_cli_usage(diagnostics)
+            if usage_line:
+                print(usage_line, file=sys.stderr)
         if args.diagnostics:
             breakdown = build_cli_breakdown(diagnostics)
             if breakdown:

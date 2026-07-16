@@ -3,7 +3,8 @@ diagnostics/store.py — Provider latency data model + in-memory store (Mileston
 
 Measure-only. Records attribution + timing for each provider attempt during
 `ProviderRouter.route()`. **No message/prompt/response content is ever stored** —
-only provider/transport/model/timing/outcome and a short, truncated error string.
+only provider/transport/model/timing/outcome, a short truncated error string,
+and (M27.1) content-free token *counts* (never token text).
 
   ProviderCallRecord — one provider attempt.
   RequestTrace       — one route() call (a list of records + summary fields).
@@ -84,6 +85,10 @@ class ProviderCallRecord:
     availability_ms: float = 0.0      # time in is_available()
     call_ms: float = 0.0              # time in complete() (0.0 if never reached)
     duration_ms: float = 0.0          # availability_ms + call_ms
+    # Token usage (M27.1) — content-free counts (prompt/completion/total), or
+    # None when the transport can't report them ("unavailable"). NOT content:
+    # counts only, never token text — the no-content rule still holds.
+    usage: dict[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)

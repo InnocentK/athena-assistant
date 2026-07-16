@@ -985,6 +985,14 @@ body {
   font-family: var(--font-ui);
 }
 
+/* Token usage line (M27.1) — quieter than the summary; counts only. */
+.message-usage {
+  font-size: 0.70rem;
+  color: #666;
+  font-family: var(--font-ui);
+  margin-top: 2px;
+}
+
 /* Compact, proportional, outcome-coloured timeline (capped width). */
 .diag-timeline {
   display: flex;

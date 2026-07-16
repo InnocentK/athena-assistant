@@ -33,6 +33,30 @@ class ProviderResponse:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
+def extract_openai_usage(response: Any) -> dict[str, Any] | None:
+    """
+    Pull token counts from an OpenAI-SDK-style completion response (M27.1).
+
+    Returns a **content-free** dict of the counts that are present
+    (``prompt_tokens`` / ``completion_tokens`` / ``total_tokens``), or ``None``
+    when the response carries no usable ``usage`` object. Token *counts* are
+    metadata (permitted in diagnostics); token *text* is never touched. Defensive
+    by contract — a provider that omits or mangles ``usage`` yields ``None``
+    ("unavailable" downstream), never an exception.
+    """
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return None
+    out: dict[str, Any] = {}
+    for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+        val = getattr(usage, key, None)
+        if isinstance(val, bool):  # bool is an int subclass — reject it explicitly
+            continue
+        if isinstance(val, (int, float)):
+            out[key] = int(val)
+    return out or None
+
+
 class ProviderAdapter(ABC):
     """
     Abstract base for all AI provider adapters.

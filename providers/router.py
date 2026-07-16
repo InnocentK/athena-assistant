@@ -289,6 +289,10 @@ class ProviderRouter:
                 rec.duration_ms = avail_ms + call_ms
                 rec.model = response.model
                 rec.transport = self._transport_for(name, response)
+                # Token usage (M27.1): best-effort, content-free. Present for API
+                # transports; None ("unavailable") for CLI transports.
+                meta = response.metadata
+                rec.usage = meta.get("usage") if isinstance(meta, dict) else None
 
             if response.success:
                 if self._log_provider_choice:

@@ -308,6 +308,13 @@ function appendDiagnostics(diag) {
     s.textContent = summary; // textContent — no XSS
     box.appendChild(s);
   }
+  const usageText = buildUsageText(diag); // M27.1
+  if (usageText) {
+    const u = document.createElement("div");
+    u.className = "message-usage";
+    u.textContent = usageText; // textContent — counts only, no XSS
+    box.appendChild(u);
+  }
   const timeline = buildTimeline(diag);
   if (timeline) box.appendChild(timeline);
   const details = buildDetails(diag);
@@ -459,6 +466,38 @@ function buildDiagnosticsSummary(diag) {
     return priors.join("; ") + "; " + core;
   }
   return core.charAt(0).toUpperCase() + core.slice(1);
+}
+
+
+/**
+ * Token-usage line for the selected provider (M27.1), from the M22 trace.
+ * Content-free — counts only. Examples:
+ *   "Tokens: 1,204 prompt + 320 completion = 1,524 total"
+ *   "Tokens: unavailable"   (CLI transports / providers that don't report)
+ * "" when there is no usable trace.
+ */
+function buildUsageText(diag) {
+  if (!diag || !Array.isArray(diag.records) || !diag.selected) return "";
+  const selRec = diag.records.find(function (r) {
+    return r.provider === diag.selected;
+  });
+  const usage = selRec && selRec.usage;
+  if (!usage || typeof usage !== "object") return "Tokens: unavailable";
+  function fmt(n) {
+    return typeof n === "number" ? n.toLocaleString() : null;
+  }
+  const parts = [];
+  if (typeof usage.prompt_tokens === "number") {
+    parts.push(fmt(usage.prompt_tokens) + " prompt");
+  }
+  if (typeof usage.completion_tokens === "number") {
+    parts.push(fmt(usage.completion_tokens) + " completion");
+  }
+  let body = parts.join(" + ");
+  if (typeof usage.total_tokens === "number") {
+    body = (body ? body + " = " : "") + fmt(usage.total_tokens) + " total";
+  }
+  return body ? "Tokens: " + body : "Tokens: unavailable";
 }
 
 
