@@ -453,6 +453,11 @@ This file is the durable contract; per-release history lives in
   full backups include it deliberately.
 - **The store is lock-guarded and per-profile** — `POST /profiles/activate`
   re-points `main._history` (test-pinned in `test_history.py`).
+- **`list_conversations` re-acquires the lock per `read()` deliberately**
+  (REVIEW-3.0 F13, blessed): holding it across the whole listing would
+  serialize readers and invite nested-acquisition bugs; a file deleted
+  mid-listing is skipped by the per-file guard. Do NOT "fix" this by
+  widening the lock.
 - **One Markdown renderer (M29.6).** `ConversationStore.render_markdown` is
   the only conversation-to-Markdown path — the HTTP export endpoint and
   `athena history export` both delegate to it (test-pinned equality). Don't

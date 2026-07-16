@@ -59,7 +59,8 @@ track *unreviewed change volume*, not version arithmetic:
 
 1. **Before any major version bump (X.0.0):** a FULL review is a mandatory
    release gate — all six lenses (correctness, security, concurrency,
-   cross-surface consistency, test quality, agent ergonomics) over everything
+   cross-surface AND cross-adapter consistency, test quality, agent
+   ergonomics) over everything
    unreviewed, plus a docs sweep and a coverage re-measure.
 2. **At each epic close** (end of a minor series, before the next epic
    starts): a scoped review of that epic's code — correctness, security, and
@@ -255,10 +256,11 @@ still applies):**
   drift fixed everywhere, coverage floor 70→74, review-cadence rule codified
   above. → `docs/specs/M29.7-pre-3.0-review.md`
 - **M29.8 — review remediation** (→ 2.9.8) — *proposed from the review,
-  AWAITING USER APPROVAL*: F1 upload race (`"xb"`), F2 REPL orphan-turn
-  alignment, F4 claude error-envelope ordering, F5 profile-switch
-  update-then-prune, F6 shared conversation-id validator, F7 portable/history
-  negative test, F10 claude docstring. ~40 lines total, each test-pinned.
+  APPROVED (post-errata)*: F1 upload race (`"xb"`), F2 REPL orphan-turn
+  alignment, F4 claude error-envelope ordering + F14 empty-output→failure
+  (hermes parity), F5 profile-switch update-then-prune, F6 shared
+  conversation-id validator, F7 portable/history negative test, F10 claude
+  docstring. ~45 lines total, each test-pinned.
   **M30 (→ 3.0.0) starts only after this lands.**
 
 *M30 — Streaming (epic, → 3.0.0).* SSE per-provider streaming for API
@@ -282,7 +284,10 @@ only if plain-Markdown-to-stdout ever pinches); deterministic conversation
 ordering (REVIEW-3.0 F3: two conversations created in the same second tie in
 newest-first listings and the random id suffix decides — display-only, no
 code path decides on ordering; fix would be sub-second id stamps or a
-last-activity sort; revisit if listing order ever visibly misleads).
+last-activity sort; revisit if listing order ever visibly misleads); consolidate shared test
+fakes (REVIEW-3.0 F8: `_FakeRouter`/scripted-stdin helpers are imported
+across test modules from test_cli/test_repl — move them to conftest.py or
+tests/helpers when they next change or gain another importer).
 
 ## Suggested first actions
 

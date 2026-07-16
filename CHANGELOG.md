@@ -19,10 +19,13 @@ Docs/quality only — **no code change; the app stays at 2.9.6**. Spec:
   answer), **F5 profile-switch empty-window race** (new: `clear()`+`update()`
   can expose an empty profile to a racing `/chat`), F6 duplicated
   conversation-id regex (new), F7 missing portable/history negative test,
-  F10 claude docstring drift. DEFER → F3 same-second id ordering tie
-  (display-only; actionable Later/unscheduled entry added). BLESS → F8
-  cross-module test fakes (TESTING.md note), F11 REPL closure, F12 probe
-  cache, F13 store lock pattern, F14 empty-envelope handling.
+  F10 claude docstring drift, **F14 empty-output→failure for claude (hermes
+  parity)**. DEFER → F3 same-second id ordering tie and F8 cross-module test
+  fakes (both with actionable Later/unscheduled entries). BLESS → F11 REPL
+  closure, F12 probe cache, F13 store lock pattern (INVARIANTS note added).
+  *Errata:* F8 and F14 were re-bucketed during the user's review of the
+  dispositions — the report records why, and the consistency lens now names
+  cross-adapter explicitly.
 - Lens statements recorded for everything that came back clean (security
   traversal/secret sweep, concurrency audit, cross-surface contracts, test
   quality, ergonomics, pre-batch spot-checks).

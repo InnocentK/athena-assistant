@@ -11,6 +11,14 @@ Later/unscheduled), **BLESS** (→ INVARIANTS/docs note that it's intended).
 Findings are numbered F1–F15. F1–F3 were pre-identified in the spec and are
 confirmed here; F4–F6 are new discoveries of this review.
 
+> **Errata (same milestone, user-reviewed):** the initial dispositions of F8
+> and F14 did not survive scrutiny of the bucket definitions — F8 moved
+> BLESS→DEFER (its justification was cost-based, not design-intent), F14
+> moved BLESS→FIX (the consistency lens had checked cross-*surface* but not
+> cross-*adapter*: hermes already treats empty output as failure). The
+> sections below reflect the corrected buckets; the lens-statement section
+> records the miss.
+
 ---
 
 ## Bucket: FIX — proposed M29.8 queue (awaiting user approval)
@@ -40,6 +48,15 @@ envelope whose `result` is null/absent (plausible for failure subtypes)
 would therefore render the raw JSON blob as a *successful answer*. Fix:
 evaluate `is_error` before the shape fallback; error text from `result` (if
 str), else `subtype`, else a generic message. ~10 lines + envelope tests.
+
+**F14 — empty output treated as success (claude), inconsistent with hermes**
+(reclassified BLESS→FIX in errata). Claude exit-0/empty-stdout yields an
+empty *successful* answer in both plain and JSON modes, while the hermes
+adapter already treats empty output as a **failure** — and failure is the
+better semantics: an empty answer is useless, and marking it failed lets the
+router fall through to a provider that will actually answer. Fix folded into
+the F4 edit (same function/file): empty content → provider failure ("Claude
+CLI returned no output."), both modes, + tests. ~4 lines.
 
 **F5 — profile-switch empty-window race** (`app/routers/core.py`, M28.5).
 `_switch()` runs `main._profile_data.clear()` then `.update(data)` in a
@@ -73,7 +90,7 @@ docstring touch into M29.8 since it's a code file (the no-bump sweep edits
 docs only).
 
 **Proposed shape:** one micro-milestone **M29.8 — review remediation**
-(→ 2.9.8): F1, F2, F4, F5, F6, F7, F10. Each item is ≤10 lines with its own
+(→ 2.9.8): F1, F2, F4, F5, F6, F7, F10, F14. Each item is ≤10 lines with its own
 test; they share one gate run and one commit. (Splitting per-subsystem à la
 M26.5–M26.10 would be ceremony — combined diff is ~40 lines of code.)
 
@@ -89,13 +106,17 @@ neither is warranted pre-3.0 for a cosmetic tie. Deferred with an actionable
 Later/unscheduled entry (per the standing rule that deferrals are recorded
 where agents look, not just in this report).
 
-## Bucket: BLESS — intended behavior, recorded
+**F8 — cross-module test-helper imports** (reclassified BLESS→DEFER in
+errata: the original justification — "churn without a defect" — was a cost
+argument, which is DEFER logic, not a design-intent argument).
+`test_history_cli.py` imports fakes from `tests.test_cli` /
+`tests.test_repl`; the convention would be conftest.py or a helpers module,
+and the coupling can break sibling suites on refactor. Deferred with
+trigger: **consolidate the shared fakes when they next change or gain
+another importer** (Later/unscheduled entry added; TESTING.md note keeps the
+coupling discoverable meanwhile).
 
-**F8 — cross-module test-helper imports.** `test_history_cli.py` imports
-fakes from `tests.test_cli` / `tests.test_repl`. Works, pytest-supported,
-and keeps fakes next to their primary suite; consolidating into a helpers
-module is churn without a defect. Blessed; noted in TESTING.md so the
-coupling is discoverable.
+## Bucket: BLESS — intended behavior, recorded
 
 **F11 — REPL `_on_attempt` closure-in-loop** (`noqa: B023`). The callback is
 defined, bound, and *called* within the same loop iteration (spinner and
@@ -111,9 +132,6 @@ until restart. Correct trade-off for a per-request subprocess adapter.
 lock only for the directory scan, then re-acquires per `read()` — no nested
 acquisition, no deadlock; a file deleted mid-listing is skipped by the
 per-file exception guard. Correct as designed.
-
-**F14 — empty-stdout / exit-0 in JSON mode** returns an empty successful
-answer — byte-consistent with plain mode's behavior for the same CLI output.
 
 ## Lens statements (what was checked where nothing was found)
 
@@ -133,7 +151,12 @@ answer — byte-consistent with plain mode's behavior for the same CLI output.
 - **Concurrency:** store lock discipline (F13), switch race (F5 — the one
   real finding), REPL single-thread assumptions hold, uploads race (F1).
   No other shared-state writers found in the batch code.
-- **Cross-surface consistency:** stdout/stderr contract verified for every
+- **Cross-surface consistency:** the lens as originally run checked the
+  three *surfaces* (web / one-shot / REPL) but not cross-*adapter*
+  consistency — the F14 miss (hermes vs claude empty-output semantics) is
+  the evidence, caught in the user's review of the dispositions. The cadence
+  rule's lens list now names cross-adapter explicitly.
+  stdout/stderr contract verified for every
   new command (`history` list/show/export → stdout; REPL prompts/status →
   stderr; doctor report → stdout by design). Success-only replay: F2. Usage
   and status lines render from the same builders on both CLI surfaces.
