@@ -11,6 +11,7 @@ stale module across the test suite's per-test main re-import).
 from __future__ import annotations
 
 import asyncio
+import re
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -21,8 +22,7 @@ from providers.base import Message
 
 from app.models import (
     ChatRequest, ChatResponse,
-
-
+    ProfileActivateRequest,
     ProfileUpdate,
 )
 
@@ -55,6 +55,101 @@ async def profile() -> dict[str, Any]:
     if not main._profile_data:
         raise HTTPException(status_code=404, detail="No profile loaded.")
     return main._profile_data
+
+
+_PROFILE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+@router.get("/profiles", summary="List available profiles (M28.5)")
+async def profiles_list() -> list[dict[str, Any]]:
+    """
+    Every directory under profiles/ that contains a parseable profile.yaml,
+    with its display name and whether it is the active one.
+    """
+    from core.config import profiles_dir  # noqa: PLC0415
+    from core.loader import load_yaml  # noqa: PLC0415
+
+    active = get_settings().active_profile
+    out: list[dict[str, Any]] = []
+    base = profiles_dir()
+    if not base.exists():
+        return out
+    for entry in sorted(base.iterdir()):
+        if not entry.is_dir() or not (entry / "profile.yaml").exists():
+            continue
+        try:
+            data = load_yaml(entry / "profile.yaml") or {}
+        except Exception:  # noqa: BLE001 — unreadable profile listed as broken
+            data = {}
+        out.append(
+            {
+                "name": entry.name,
+                "display_name": data.get("name", entry.name),
+                "active": entry.name == active,
+            }
+        )
+    return out
+
+
+@router.post("/profiles/activate", summary="Switch the active profile at runtime (M28.5)")
+async def profiles_activate(body: ProfileActivateRequest) -> dict[str, Any]:
+    """
+    Activate profiles/<name> without a restart.
+
+    Persists the selection to config/active_profile.yaml (which beats the
+    ACTIVE_PROFILE env — see core/config.py resolution order; the CLI's
+    --profile flag still beats both), then reinitializes the profile-bound
+    state (_profile_data, memory, saved items). In-flight requests finish
+    against the OLD managers (handlers bind main.X at call time); new
+    requests see the new profile. Never touches .env.
+    """
+    from core.config import APP_ROOT, active_profile_dir, profiles_dir  # noqa: PLC0415
+    from core.loader import load_yaml, save_yaml  # noqa: PLC0415
+    from memory.manager import MemoryManager  # noqa: PLC0415
+    from saved.manager import SavedItemsManager  # noqa: PLC0415
+
+    name = body.name.strip()
+    if not _PROFILE_NAME_RE.match(name):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid profile name (letters, digits, - and _ only).",
+        )
+    target = profiles_dir() / name / "profile.yaml"
+    if not target.exists():
+        raise HTTPException(status_code=404, detail=f"Profile not found: {name}")
+    data = load_yaml(target)
+    if not isinstance(data, dict) or not data:
+        raise HTTPException(
+            status_code=400, detail=f"Profile '{name}' has an invalid profile.yaml."
+        )
+
+    def _switch() -> None:
+        save_yaml(
+            APP_ROOT / "config" / "active_profile.yaml",
+            {"active_profile": name},
+            sort_keys=False,
+        )
+        get_settings.cache_clear()
+        main._profile_data.clear()
+        main._profile_data.update(data)
+        main._memory = MemoryManager(active_profile_dir(), main._profile_data)
+        main._saved = SavedItemsManager(active_profile_dir())
+
+    await asyncio.to_thread(_switch)
+    logger.info("Profile switched to '%s' (runtime, M28.5).", name)
+    main.write_ops_event(
+        event="profile_activate", outcome="success", detail={"profile": name}
+    )
+    return {
+        "activated": True,
+        "name": name,
+        "display_name": data.get("name", name),
+        "note": (
+            "Selection persisted to config/active_profile.yaml — survives "
+            "restarts and applies to the CLI's next run. In-flight requests "
+            "finish on the previous profile."
+        ),
+    }
 
 
 @router.patch("/profile", summary="Update editable profile settings (M26)")

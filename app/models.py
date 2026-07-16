@@ -161,6 +161,12 @@ class PortableImportRequest(BaseModel):
     new_name: Optional[str] = None  # import under this name if the bundle's exists
 
 
+class ProfileActivateRequest(BaseModel):
+    """Switch the active profile at runtime (M28.5)."""
+
+    name: str   # directory name under profiles/ ([A-Za-z0-9_-]+)
+
+
 class ProfileUpdate(BaseModel):
     """
     Partial update of the editable profile settings (M26).

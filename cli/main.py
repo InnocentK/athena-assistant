@@ -174,9 +174,11 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("a prompt is required (or use --list-providers)")
 
     # Resolve the profile BEFORE importing Athena modules: get_settings() is
-    # @lru_cache'd and reads ACTIVE_PROFILE, so it must be set first.
+    # @lru_cache'd, so the override must be set first. M28.5: --profile sets
+    # ATHENA_PROFILE_OVERRIDE (not ACTIVE_PROFILE) so the explicit flag beats
+    # the runtime switch file config/active_profile.yaml too.
     if args.profile:
-        os.environ["ACTIVE_PROFILE"] = args.profile
+        os.environ["ATHENA_PROFILE_OVERRIDE"] = args.profile
 
     # Deferred imports so the env above is in effect and FastAPI is never loaded.
     try:

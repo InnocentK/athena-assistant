@@ -398,6 +398,20 @@ This file is the durable contract; per-release history lives in
 
 ## Settings / profile (M26)
 
+- **Active-profile resolution order is override > switch-file > env > default
+  (M28.5).** `ATHENA_PROFILE_OVERRIDE` (set by the CLI `--profile` flag) beats
+  `config/active_profile.yaml`, which beats `ACTIVE_PROFILE`. The switch file
+  is written ONLY by `POST /profiles/activate`; its read is defensive (a broken
+  file must fall through to env, never brick boot). Do not reorder these.
+- **`POST /profiles/activate` validates `^[A-Za-z0-9_-]+$`** before touching
+  the filesystem (traversal guard), never edits `.env`, and re-points
+  `_profile_data` (clear+update in place) + `main._memory` + `main._saved`.
+  In-flight requests finishing on the old managers is the intended semantics.
+- **Env-mutating CLI flags need the conftest guard.** The CLI runs in-process
+  in tests; `--profile`'s env write is cleared by an autouse fixture. A future
+  flag that sets env must get the same treatment or it leaks across tests.
+- Tests: `tests/test_profile_switch.py`.
+
 - **`PATCH /profile` is the only UI write to `profile.yaml`.** It validates
   before writing, touches only `system_prompt` / `routing.mode` /
   `routing.preferred_provider`, persists with `save_yaml(..., sort_keys=False)`

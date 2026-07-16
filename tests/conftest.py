@@ -54,6 +54,22 @@ def _no_real_provider_clis(monkeypatch: pytest.MonkeyPatch):
 
 
 # ---------------------------------------------------------------------------
+# Env hygiene (M28.5)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _clear_profile_override(monkeypatch: pytest.MonkeyPatch):
+    """
+    The CLI's --profile flag sets ATHENA_PROFILE_OVERRIDE for its (normally
+    one-shot) process. In tests the CLI runs in-process, so the variable would
+    leak into every later test's Settings resolution — clear it before each
+    test. (Within-test behaviour is untouched: the CLI sets it after this.)
+    """
+    monkeypatch.delenv("ATHENA_PROFILE_OVERRIDE", raising=False)
+
+
+# ---------------------------------------------------------------------------
 # tmp_project fixture
 # ---------------------------------------------------------------------------
 

@@ -186,11 +186,10 @@ still applies):**
   smallest, done first). Full-width panels on phones, 16px input (no iOS
   focus-zoom), `100dvh`, safe-area insets + `viewport-fit=cover`. **USER TODO:
   eyeball on the phone.** → `docs/specs/M28.4-mobile-ui-pass.md`
-- **M28.5 — profile switcher** (→ 2.8.5). Activate a different profile at
-  runtime (endpoint + UI dropdown) instead of editing `ACTIVE_PROFILE` +
-  restart. Completes M28: imported portable profiles become usable in-app.
-  CAREFUL: reinitializes `_profile_data`/`_memory`/`_saved` — read the
-  concurrency + settings INVARIANTS first.
+- **M28.5 — profile switcher** (→ 2.8.5) — *shipped.* `GET /profiles` +
+  `POST /profiles/activate` (validated, ops-audited, never touches `.env`) +
+  settings-panel dropdown; resolution order override > switch-file > env >
+  default (see INVARIANTS). → `docs/specs/M28.5-profile-switcher.md`
 - **M28.6 — `athena doctor`** (→ 2.8.6). Preflight diagnostics CLI: `.env` keys
   present, vendor CLIs found/logged-in, DAV reachability, versions, disk. The
   executable form of the M26.27 platform matrix.

@@ -4,6 +4,34 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [2.8.5] — Milestone 28.5 — Runtime profile switcher
+
+**App bumped to 2.8.5.** Spec: `docs/specs/M28.5-profile-switcher.md`.
+Completes the M28 story: an imported portable profile is now usable in-app.
+
+### Added
+- **`GET /profiles`** (list with `active` flag) and **`POST /profiles/activate`**
+  — switch the active profile at runtime: validates the name
+  (`^[A-Za-z0-9_-]+$`; blocks traversal) and the target `profile.yaml`,
+  persists the selection to **`config/active_profile.yaml`**, clears the
+  settings cache, and re-points `_profile_data`/memory/saved-items at the new
+  profile dir. In-flight requests finish on the old profile (call-time `main.X`
+  binding); new requests see the new one. Ops-audited; never touches `.env`.
+- **Resolution order** (`core/config.py`): `ATHENA_PROFILE_OVERRIDE` env (the
+  CLI's `--profile` now sets this — the explicit flag beats everything) →
+  switch file → `ACTIVE_PROFILE` env → `athena`. The file deliberately beats
+  env so a UI switch survives restart on default installs (where `.env` sets
+  `ACTIVE_PROFILE`); a broken switch file falls through harmlessly.
+- **UI**: settings → Profile tab gains an "Active profile" dropdown + Activate
+  (shown when >1 profile exists); full reload on switch.
+
+### Notes
+- Test-infra: an autouse conftest guard clears `ATHENA_PROFILE_OVERRIDE`
+  between tests (the CLI is one-shot in production but in-process in tests —
+  without the guard the flag's env write leaked into 32 later tests).
+  Tests: `tests/test_profile_switch.py` (6). Gate: ruff + mypy + 495 pytest +
+  21 vitest.
+
 ## [2.8.4] — Milestone 28.4 — Mobile-responsive UI pass
 
 CSS + one viewport-meta attribute — **app bumped to 2.8.4**. Spec:

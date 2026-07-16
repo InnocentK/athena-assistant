@@ -964,10 +964,11 @@ async function loadSettingsProfile() {
   const token = ++_panelLoadToken.settings;
   body.textContent = "";
   try {
-    const [profileRes, healthRes, providersRes] = await Promise.all([
+    const [profileRes, healthRes, providersRes, profilesRes] = await Promise.all([
       fetch("/profile"),
       fetch("/health"),
       fetch("/providers"),
+      fetch("/profiles"),
     ]);
     if (token !== _panelLoadToken.settings) return; // superseded by a newer load
     if (!profileRes.ok) {
@@ -986,6 +987,46 @@ async function loadSettingsProfile() {
     // App (release) version vs profile schema version are distinct (M26.2).
     body.appendChild(_settingsRow("App version", health.version));
     body.appendChild(_settingsRow("Profile schema version", p.version));
+
+    // --- Active profile switcher (M28.5) ---
+    const profiles = profilesRes && profilesRes.ok ? await profilesRes.json() : [];
+    if (token !== _panelLoadToken.settings) return;
+    if (Array.isArray(profiles) && profiles.length > 1) {
+      body.appendChild(_settingsSectionTitle("Active profile"));
+      let activeName = "";
+      const profileOptions = profiles.map(function (pr) {
+        if (pr.active) activeName = pr.name;
+        return { value: pr.name, label: pr.display_name + " (" + pr.name + ")" };
+      });
+      const profileSelect = _settingsSelect(profileOptions, activeName);
+      body.appendChild(_settingsControlRow("Profile", profileSelect));
+      const activateBtn = document.createElement("button");
+      activateBtn.className = "settings-save-btn";
+      activateBtn.textContent = "Activate";
+      activateBtn.addEventListener("click", async function () {
+        if (profileSelect.value === activeName) return;
+        activateBtn.disabled = true;
+        try {
+          const res = await fetch("/profiles/activate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: profileSelect.value }),
+          });
+          if (res.ok) {
+            // Full reload: name, memory, saved items all change with the profile.
+            window.location.reload();
+          } else {
+            const err = await res.json().catch(function () { return {}; });
+            _settingsMessage(body, "Switch failed: " + (err.detail || res.status), "settings-error");
+            activateBtn.disabled = false;
+          }
+        } catch (e) {
+          _settingsMessage(body, "Switch failed: network error", "settings-error");
+          activateBtn.disabled = false;
+        }
+      });
+      body.appendChild(activateBtn);
+    }
 
     // --- Editable settings (M26): system prompt, mode, preferred provider ---
     body.appendChild(_settingsSectionTitle("System prompt"));
