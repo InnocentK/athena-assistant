@@ -137,19 +137,11 @@ frontend test harness). Full per-milestone detail is in `CHANGELOG.md`.
 (`task lint`), mypy (`task typecheck`), pytest (`task test:run`), vitest jsdom
 (`task test:js`). The SessionStart hook reports lint+types+suite at session start.
 
-**Specced, awaiting go-ahead — the foundations batch (specs in `docs/specs/`):**
+**Shipped (continued) — the foundations batch M26.23–M26.26** (git init + first
+commits, coverage floor, pip-audit + CVE fix → 2.6.25, pre-commit hooks) and the
+feature run below. Specs for all shipped milestones are archived in `docs/specs/`.
 
-- **M26.23 — git init + first commit.** The project isn't under version control
-  yet; this is foundational (unblocks CI + pre-commit). Needs your input on
-  identity/remote. → `docs/specs/M26.23-git-init.md`
-- **M26.24 — coverage measurement.** `pytest-cov` + a `fail_under` floor.
-  → `docs/specs/M26.24-coverage.md`
-- **M26.25 — dependency vuln scan + fix.** `pip-audit`; remediates a measured
-  finding (4 CVEs in `python-multipart` 0.0.26 → 0.0.31). → `docs/specs/M26.25-pip-audit.md`
-- **M26.26 — pre-commit hooks.** ruff+mypy+hygiene at commit time; **needs
-  M26.23 first.** → `docs/specs/M26.26-pre-commit.md`
-
-**Specced, awaiting go-ahead (docs mini-milestone + feature epics — specs in `docs/specs/`):**
+**Shipped feature milestones (specs in `docs/specs/`):**
 
 - **M26.27 — platform support & limitations docs.** *Shipped* (no bump): a
   "Running Athena on <platform>" support matrix (Mac tested / Linux expected /
@@ -177,15 +169,59 @@ frontend test harness). Full per-milestone detail is in `CHANGELOG.md`.
   provider names, and repeats the fork warning.
   → `docs/specs/M28-portable-profiles.md` + `docs/PORTABLE-PROFILES.md`
 
-Historical specs for shipped milestones are archived in `docs/specs/` (they
-record the scope + measured counts + self-review for M26.19–M26.22).
+**Upcoming — agreed direction to 3.0 (spec each before implementing; the loop
+still applies):**
 
-**Later / unscheduled:** true per-provider streaming (SSE/WebSocket); CLI REPL;
-persistent cross-session history; real file uploads; Ollama phase 2 (multi-model,
-embeddings, tools); generic OpenAI-compatible local-provider abstraction;
-saved-items surfacing (`athena saved …`) + non-file saved-search targets;
-web-search backend; a shared chat-turn helper. (The JS/UI test harness is now
-scheduled as M26.22.)
+*The 2.8.z patch batch — small, independent mini-milestones, done BEFORE M29:*
+
+- **M28.2 — Claude-CLI token usage** (→ 2.8.2). The deferred M27.1 follow-up:
+  switch the Claude adapter to `--output-format json`, parse usage defensively,
+  fall back to plain text on any parse/flag failure (never break the primary
+  provider for a metric). **Must be validated against the real `claude` CLI on
+  the Mac** — the mocked suite can't confirm the envelope format.
+- **M28.3 — remote-access doc** (docs only, no bump). The fuller Tailscale/VPN +
+  authenticated-reverse-proxy-TLS guidance; builds on `docs/PLATFORMS.md`
+  (which stays the canonical matrix — link, don't restate). No code; no auth
+  layer in Athena, ever (perimeter's job).
+- **M28.4 — profile switcher** (→ 2.8.4). Activate a different profile at
+  runtime (endpoint + UI dropdown) instead of editing `ACTIVE_PROFILE` +
+  restart. Completes M28: imported portable profiles become usable in-app.
+- **M28.5 — `athena doctor`** (→ 2.8.5). Preflight diagnostics CLI: `.env` keys
+  present, vendor CLIs found/logged-in, DAV reachability, versions, disk. The
+  executable form of the M26.27 platform matrix.
+- **M28.6 — mobile-responsive UI pass** (→ 2.8.6). CSS-only responsive layout
+  for the phone-over-Tailscale + PWA (M26.28) path. No logic changes.
+
+*M29 — Conversations (epic, 2.9.x) — in dependency order:*
+
+- **M29.0 — shared chat-turn helper.** ONE code path assembling a turn
+  (history, system prompt, memory extraction) used by both the web `/chat`
+  handler and the CLI. Prerequisite for everything below.
+- **M29.1 — persistent cross-session history.** Conversations survive restarts
+  as plain local files. Chat history stays OUT of portable bundles (M28
+  striplist — already an invariant).
+- **M29.2 — CLI REPL.** `athena` with no prompt → interactive multi-turn
+  session (leans on M27 live status + M29.0/29.1).
+- **M29.3 — real file uploads.** Attach a file to a turn; policed by the
+  existing files allowlist.
+- **M29.4 — conversation export.** Markdown export of a conversation
+  (depends on M29.1).
+
+*M30 — Streaming (epic, → 3.0.0).* SSE per-provider streaming for API
+transports; streamed rendering in the web UI; streamed stdout in the CLI. CLI
+transports degrade gracefully to today's one-shot behaviour (same honest-
+fallback pattern as token usage). This changes the `/chat` response contract —
+the reason it IS the major bump.
+
+**Later / unscheduled:** Ollama phase 2 (multi-model, embeddings, tools);
+generic OpenAI-compatible local-provider abstraction; saved-items surfacing
+(`athena saved …`) + non-file saved-search targets; relevance-based memory
+retrieval (inject only relevant entries per turn — embeddings via Ollama when
+available, keyword fallback; measure prompt sizes first); real tool-calling for
+API transports (OpenAI-SDK function calling so API providers can invoke
+calendar/contacts/files; needs its own safety framing — write actions gated as
+the UI gates them); update checker / `athena update` (blocked on the repo
+having a git remote).
 
 ## Suggested first actions
 
