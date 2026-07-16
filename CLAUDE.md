@@ -235,7 +235,10 @@ available, keyword fallback; measure prompt sizes first); real tool-calling for
 API transports (OpenAI-SDK function calling so API providers can invoke
 calendar/contacts/files; needs its own safety framing — write actions gated as
 the UI gates them); update checker / `athena update` (blocked on the repo
-having a git remote).
+having a git remote); richer history export (zip bundles of many
+conversations, an export-all web endpoint, date-range selection — the
+deliberate scope cut from M29.6's stdout-only variadic CLI export; revisit
+only if plain-Markdown-to-stdout ever pinches).
 
 ## Suggested first actions
 
