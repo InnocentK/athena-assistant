@@ -4,6 +4,29 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [2.8.6] — Milestone 28.6 — `athena doctor` (preflight diagnostics)
+
+**App bumped to 2.8.6.** Spec: `docs/specs/M28.6-doctor.md`. The executable
+form of the M26.27 platform matrix.
+
+### Added
+- **`athena doctor`** (also `athena --doctor`): a preflight report —
+  app/python versions, `.env` presence + which provider key **names** are set
+  (**never values** — test-enforced), vendor CLIs on PATH, active-profile
+  resolution (+ source: override/file/env/default) and `profile.yaml`
+  validity, `logs/`/`audit/`/`data/` writability, free disk, DAV configs
+  (enabled + url, **not probed**). Exit 1 iff any check fails; warns don't
+  fail. Config/filesystem-only — deliberately **no network** (same rule as
+  router availability), so it's deterministic and works offline.
+- Implementation: `cli/doctor.py` (pure check functions → testable without
+  stdout capture); `doctor` token normalised like the `ask` alias; runs
+  before any profile/router init.
+
+### Notes
+- Tests: `tests/test_doctor.py` (6) — incl. the secret-hygiene contract (a
+  planted key value never appears in the report). Gate: ruff + mypy + 501
+  pytest + 21 vitest. **The 2.8.z patch batch (M28.2–M28.6) is complete.**
+
 ## [2.8.5] — Milestone 28.5 — Runtime profile switcher
 
 **App bumped to 2.8.5.** Spec: `docs/specs/M28.5-profile-switcher.md`.

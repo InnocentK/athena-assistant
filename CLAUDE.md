@@ -190,9 +190,11 @@ still applies):**
   `POST /profiles/activate` (validated, ops-audited, never touches `.env`) +
   settings-panel dropdown; resolution order override > switch-file > env >
   default (see INVARIANTS). → `docs/specs/M28.5-profile-switcher.md`
-- **M28.6 — `athena doctor`** (→ 2.8.6). Preflight diagnostics CLI: `.env` keys
-  present, vendor CLIs found/logged-in, DAV reachability, versions, disk. The
-  executable form of the M26.27 platform matrix.
+- **M28.6 — `athena doctor`** (→ 2.8.6) — *shipped.* Preflight report
+  (config/filesystem only, NO network, never prints secret values): versions,
+  key names set/not, vendor CLIs, profile resolution, dir writability, disk,
+  DAV config. Exit 1 iff a check fails. → `docs/specs/M28.6-doctor.md`
+  **The 2.8.z patch batch is complete — next up is M29.0.**
 
 *M29 — Conversations (epic, 2.9.x) — in dependency order:*
 

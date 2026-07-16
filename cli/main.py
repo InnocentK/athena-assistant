@@ -93,6 +93,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print an expanded per-provider timing breakdown on stderr.",
     )
+    parser.add_argument(
+        "--doctor",
+        action="store_true",
+        help="Run preflight diagnostics (config/filesystem only) and exit. "
+        "Also available as: athena doctor",
+    )
     return parser
 
 
@@ -107,6 +113,9 @@ def _normalize_argv(argv: list[str]) -> list[str]:
     """
     if argv and argv[0] == "ask":
         return argv[1:]
+    # M28.6: `athena doctor` sugar — same alias mechanism as `ask`.
+    if argv and argv[0] == "doctor":
+        return ["--doctor"] + argv[1:]
     return argv
 
 
@@ -167,6 +176,12 @@ def main(argv: list[str] | None = None) -> int:
         argv = sys.argv[1:]
     argv = _normalize_argv(argv)
     args = parser.parse_args(argv)
+
+    # M28.6: doctor runs before any profile/router init and exits with its code.
+    if args.doctor:
+        from cli.doctor import run_doctor  # noqa: PLC0415
+
+        return run_doctor()
 
     # Usage validation that needs no Athena imports: the ask path requires a
     # prompt, but --list-providers does not.
