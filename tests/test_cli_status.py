@@ -191,3 +191,70 @@ def test_set_text_is_safe_when_inactive():
     sp.set_text("Trying claude/cli…")
     sp.stop()
     assert stream.getvalue() == ""
+
+
+# ---------------------------------------------------------------------------
+# drive_stream (M30) — chunks to stdout, spinner stopped at first chunk
+# ---------------------------------------------------------------------------
+
+
+class _RecordingSpinner:
+    """Stands in for Spinner; records when stop() happens."""
+
+    def __init__(self):
+        self.stops = 0
+
+    def stop(self):
+        self.stops += 1
+
+
+def _drive(events, capsys):
+    from cli.status import drive_stream
+
+    spinner = _RecordingSpinner()
+    final, printed = drive_stream(iter(events), spinner)
+    return final, printed, spinner, capsys.readouterr()
+
+
+def test_drive_stream_prints_chunks_in_order_with_trailing_newline(capsys):
+    from providers.base import ProviderResponse
+
+    done = ProviderResponse(content="Hello world", provider_name="p", success=True)
+    final, printed, spinner, cap = _drive(
+        [("chunk", "Hello "), ("chunk", "world"), ("done", done)], capsys
+    )
+
+    assert final is done
+    assert printed is True
+    assert cap.out == "Hello world\n"   # newline appended exactly once
+    assert spinner.stops == 1           # stopped at the FIRST chunk only
+
+
+def test_drive_stream_does_not_double_trailing_newline(capsys):
+    from providers.base import ProviderResponse
+
+    done = ProviderResponse(content="line\n", provider_name="p", success=True)
+    final, printed, spinner, cap = _drive(
+        [("chunk", "line\n"), ("done", done)], capsys
+    )
+    assert cap.out == "line\n"
+
+
+def test_drive_stream_no_chunks_prints_nothing(capsys):
+    from providers.base import ProviderResponse
+
+    done = ProviderResponse(success=False, content="", provider_name="p", error="dead")
+    final, printed, spinner, cap = _drive([("done", done)], capsys)
+
+    assert final is done
+    assert printed is False
+    assert cap.out == ""
+    assert spinner.stops == 0  # caller stops it after drive_stream returns
+
+
+def test_drive_stream_ending_without_done_returns_none(capsys):
+    final, printed, spinner, cap = _drive([("chunk", "half a")], capsys)
+
+    assert final is None       # contract violation surfaced honestly
+    assert printed is True
+    assert cap.out == "half a\n"

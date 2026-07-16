@@ -36,12 +36,11 @@ is the source of truth for what actually shipped.
 | [M29.7-pre-3.0-review.md](M29.7-pre-3.0-review.md) | Pre-3.0 review & docs sweep | no bump |
 | [M29.8-review-remediation.md](M29.8-review-remediation.md) | Review remediation (8 findings) | 2.9.8 |
 | [M29.9-remediation-review.md](M29.9-remediation-review.md) | Remediation diff-review (addendum) | no bump |
+| [M30-streaming.md](M30-streaming.md) | Streaming (SSE) — the major release | **3.0.0** |
 
 ## Approved, pending implementation
 
-| Spec | Milestone | Notes |
-|---|---|---|
-| [M30-streaming.md](M30-streaming.md) | Streaming (SSE) — **the 3.0.0 release** | Adapters `complete_stream` → router `route_stream` → `POST /chat/stream` → UI reader w/ buffered fallback → CLI live chunks. Ships atomically. Blocked on the M29.8 review-remediation queue (see `docs/history/REVIEW-3.0-2026-07.md`). |
+*(none — 3.0.0 shipped; the next milestone starts from a fresh spec)*
 
 Review reports live in [`../history/`](../history/) (REVIEW-2026-07,
 REVIEW-3.0-2026-07). The review-cadence rule — when the next review is due —

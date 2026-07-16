@@ -123,6 +123,44 @@ class Spinner:
         self.stop()
 
 
+def drive_stream(events: Any, spinner: "Spinner") -> tuple[Any, bool]:
+    """
+    Drive a ``ProviderRouter.route_stream()`` event iterator for the CLI (M30).
+
+    Text chunks print to STDOUT as they arrive — the answer-only contract
+    holds because the chunks ARE the answer. The spinner (STDERR) is stopped
+    just before the first chunk so status and answer never interleave on
+    screen; until then it keeps animating, including across zero-chunk
+    provider fallbacks. A trailing newline is appended iff chunks were printed
+    and the text didn't already end with one (matching ``print(content)``).
+
+    Returns ``(final_response, printed_any)``. ``final_response`` is the
+    ``done`` event's ProviderResponse, or None if the iterator ended without
+    one (contract violation) — callers must treat None as a failure.
+    """
+    printed_any = False
+    ends_with_newline = False
+    final: Any = None
+    for kind, payload in events:
+        if kind == "chunk":
+            text = str(payload) if payload is not None else ""
+            if not text:
+                continue
+            if not printed_any:
+                spinner.stop()  # the answer starts now — clear the status line
+                printed_any = True
+            sys.stdout.write(text)
+            sys.stdout.flush()
+            ends_with_newline = text.endswith("\n")
+        elif kind == "done":
+            final = payload
+            break
+    if printed_any and not ends_with_newline:
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+    return final, printed_any
+
+
 def _label(rec: dict[str, Any]) -> str:
     provider = rec.get("provider", "?")
     transport = rec.get("transport")

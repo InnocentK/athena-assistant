@@ -44,6 +44,18 @@ class _FakeRouter:
             on_attempt({"provider": "fake", "transport": "api", "mode": "balanced"})
         return self._response
 
+    def route_stream(self, messages, system_prompt, profile_config, on_attempt=None):
+        """M30 streaming analog: the real router degrades to one buffered chunk
+        + done for non-streaming adapters — mirror that, reusing route() so the
+        recorded calls/counters are identical whichever path the CLI takes."""
+        self.record["streamed"] = True
+        response = self.route(
+            messages, system_prompt, profile_config, on_attempt=on_attempt
+        )
+        if response.success and response.content:
+            yield ("chunk", response.content)
+        yield ("done", response)
+
     def list_providers(self):
         return self._providers
 
@@ -512,3 +524,73 @@ def test_quiet_suppresses_all_status_even_with_diagnostics(cli_env, monkeypatch,
     assert code == 0
     assert cap.out.strip() == "42"
     assert cap.err.strip() == ""  # --quiet wins over --diagnostics
+
+
+# ---------------------------------------------------------------------------
+# M30 — streaming default, --no-stream escape hatch
+# ---------------------------------------------------------------------------
+
+
+class _ChunkedRouter(_FakeRouter):
+    """route_stream yields real incremental chunks (not the delegate shim)."""
+
+    def route_stream(self, messages, system_prompt, profile_config, on_attempt=None):
+        self.record["streamed"] = True
+        if on_attempt is not None:
+            on_attempt({"provider": "fake", "transport": "api", "mode": "balanced"})
+        yield ("chunk", "Hello ")
+        yield ("chunk", "world")
+        yield (
+            "done",
+            ProviderResponse(
+                content="Hello world", provider_name="fake", model="m", success=True
+            ),
+        )
+
+
+def test_streaming_is_the_default_and_prints_chunks_once(cli_env, monkeypatch, capsys):
+    from cli.main import main
+
+    record: dict = {}
+    _install_router(monkeypatch, _ChunkedRouter(record=record))
+
+    code = main(["--no-memory", "q"])
+    cap = capsys.readouterr()
+
+    assert code == 0
+    assert record.get("streamed") is True
+    # chunks land on stdout in order, once, with a trailing newline — and the
+    # final content is NOT printed a second time.
+    assert cap.out == "Hello world\n"
+
+
+def test_no_stream_flag_uses_buffered_route(cli_env, monkeypatch, capsys):
+    from cli.main import main
+
+    record: dict = {}
+    router = _FakeRouter(record=record)
+    _install_router(monkeypatch, router)
+
+    code = main(["--no-memory", "--no-stream", "q"])
+    cap = capsys.readouterr()
+
+    assert code == 0
+    assert "streamed" not in record  # route_stream never touched
+    assert router.route_calls == 1
+    assert cap.out == "hi from fake\n"
+
+
+def test_stream_failure_exits_1_with_stderr_error(cli_env, monkeypatch, capsys):
+    from cli.main import main
+
+    failure = ProviderResponse(
+        success=False, content="", provider_name="fake", error="all dead"
+    )
+    _install_router(monkeypatch, _FakeRouter(failure))
+
+    code = main(["--no-memory", "q"])
+    cap = capsys.readouterr()
+
+    assert code == 1
+    assert cap.out == ""  # nothing was streamed; stdout stays clean
+    assert "all dead" in cap.err

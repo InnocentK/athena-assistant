@@ -12,6 +12,10 @@
  * Milestone 5 — push-to-talk voice integration via voice.js (loaded before
  * this file). Wires the #ptt-btn button to VoiceController and adds TTS
  * playback of assistant responses via SpeechSynthesis.
+ *
+ * M30 — streaming: sendMessage tries POST /chat/stream (SSE) first and grows
+ * the assistant bubble as chunks arrive; any failure before the first chunk
+ * falls back to the buffered POST /chat (_sendBuffered), which is unchanged.
  */
 
 /* ---------------------------------------------------------
@@ -208,7 +212,7 @@ async function loadProviders() {
 
 
 /* ---------------------------------------------------------
-   Send message
+   Send message (M30: streaming-first, buffered fallback)
    --------------------------------------------------------- */
 async function sendMessage() {
   if (isThinking) return;
@@ -234,75 +238,14 @@ async function sendMessage() {
   conversationHistory.push({ role: "user", content: text });
 
   try {
-    // --- Network phase: this try/catch guards ONLY the fetch + JSON parse.
-    // A rendering/TTS error later must NOT be reported as a network error (M26.10).
-    let res;
-    try {
-      res = await fetch("/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: text,
-          history: historyToSend,
-          conversation_id: conversationId, // M29.1 (null → server creates one)
-        }),
-      });
-    } catch (_) {
-      appendMessage("error", "Network error — could not reach the assistant.", null, null);
-      setStatusDot("error");
-      return; // finally still resets input state
+    // M30: try the streaming endpoint first. It returns false ONLY when
+    // nothing has been rendered yet (endpoint missing/erroring, network
+    // failure before the first chunk) — then the buffered /chat is the
+    // safety net, so the UI is never less reliable than before M30.
+    const handled = await _sendStreaming(text, historyToSend);
+    if (!handled) {
+      await _sendBuffered(text, historyToSend);
     }
-
-    if (!res.ok) {
-      // HTTP error (4xx / 5xx)
-      let detail = "Request failed (" + res.status + ").";
-      try {
-        const errBody = await res.json();
-        if (errBody && errBody.detail) detail = errBody.detail;
-      } catch (_) {}
-      appendMessage("error", detail, null, null);
-      setStatusDot("error");
-      return;
-    }
-
-    let data;
-    try {
-      data = await res.json();
-    } catch (_) {
-      appendMessage("error", "Received a malformed response from the assistant.", null, null);
-      setStatusDot("error");
-      return;
-    }
-
-    // --- Render phase (network already succeeded). ---
-    // M29.1: adopt the server's conversation id (first turn creates it).
-    if (data.conversation_id) {
-      conversationId = data.conversation_id;
-    }
-    if (data.success === false) {
-      // Provider returned a failure response — show as error style, but do NOT
-      // record it as an assistant turn (M26.10): otherwise "All providers
-      // failed." would be replayed to providers on every later message.
-      appendMessage("error", data.response, data.provider, data.model);
-      setStatusDot("error");
-    } else {
-      conversationHistory.push({ role: "assistant", content: data.response });
-      appendMessage("assistant", data.response, data.provider, data.model);
-      setStatusDot("ready");
-      if (data.provider) {
-        updateProviderBadge(data.provider);
-      }
-      // Speak the response if TTS is available. Guarded so a missing voice.js
-      // (or a speak() error) can't break the answer that already rendered.
-      if (typeof voice !== "undefined" && voice.isTTSSupported) {
-        try {
-          voice.speak(data.response);
-        } catch (_) {}
-      }
-    }
-
-    // M24/M24.5: diagnostics under the answer (summary + timeline + details)
-    appendDiagnostics(data.diagnostics);
   } finally {
     // Re-enable input regardless of outcome
     isThinking = false;
@@ -310,6 +253,270 @@ async function sendMessage() {
     setChatStatus("");
     messageInput.focus();
   }
+}
+
+
+/**
+ * M30 — POST /chat/stream and render the reply incrementally.
+ *
+ * Returns true when this attempt handled the turn (answer or error rendered);
+ * returns false ONLY when it is safe to fall back to the buffered /chat:
+ * nothing rendered yet and the request failed (non-OK status, no streaming
+ * body, network error, or stream ended before any chunk/done).
+ */
+async function _sendStreaming(text, historyToSend) {
+  let res;
+  try {
+    res = await fetch("/chat/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: text,
+        history: historyToSend,
+        conversation_id: conversationId, // M29.1 (null → server creates one)
+      }),
+    });
+  } catch (_) {
+    return false; // network error before anything rendered — fall back
+  }
+  if (!res.ok || !res.body || typeof res.body.getReader !== "function") {
+    return false; // older server / HTTP error / no ReadableStream — fall back
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let stream = null; // {wrapper, bubble} — created on the first chunk
+  let assembled = "";
+  let data = null; // the `done` event's payload (mirrors ChatResponse)
+
+  try {
+    for (;;) {
+      const step = await reader.read();
+      if (step.done) break;
+      buffer += decoder.decode(step.value, { stream: true });
+      const parsed = _parseSSEFrames(buffer);
+      buffer = parsed.rest;
+      for (let i = 0; i < parsed.frames.length; i++) {
+        const frame = parsed.frames[i];
+        let payload;
+        try {
+          payload = JSON.parse(frame.data);
+        } catch (_) {
+          continue; // skip a malformed frame; the done frame decides the turn
+        }
+        if (frame.event === "chunk") {
+          const t = typeof payload.text === "string" ? payload.text : "";
+          if (t) {
+            if (!stream) stream = _beginStreamingBubble();
+            assembled += t;
+            stream.bubble.textContent = assembled; // textContent — no XSS
+            scrollToBottom();
+          }
+        } else if (frame.event === "done") {
+          data = payload;
+        }
+      }
+      if (data) break;
+    }
+  } catch (_) {
+    if (!stream) return false; // nothing rendered — buffered fallback
+    appendMessage("error", "The stream was interrupted.", null, null);
+    setStatusDot("error");
+    return true; // partial text already visible: do NOT re-send via /chat
+  }
+
+  if (!data) {
+    if (!stream) return false; // no chunks, no done — safe to fall back
+    appendMessage("error", "The stream ended unexpectedly.", null, null);
+    setStatusDot("error");
+    return true;
+  }
+
+  // --- Render phase: mirrors _sendBuffered exactly ---
+  if (data.conversation_id) {
+    conversationId = data.conversation_id; // M29.1: adopt the server's id
+  }
+
+  if (data.success === false) {
+    // Failure — error bubble, and never push to conversationHistory (M26.10:
+    // failure text must not be replayed as context on later turns).
+    const reason = data.error || data.response || "The request failed.";
+    appendMessage("error", reason, data.provider, data.model);
+    setStatusDot("error");
+    appendDiagnostics(data.diagnostics);
+    return true;
+  }
+
+  // data.response is the authoritative full text (chunks are progressive
+  // display); reconcile in the unlikely case they diverge.
+  const fullText =
+    typeof data.response === "string" && data.response ? data.response : assembled;
+  if (!stream) {
+    // Success with no chunk frames (defensive) — render buffered-style.
+    appendMessage("assistant", fullText, data.provider, data.model);
+  } else {
+    if (fullText !== assembled) stream.bubble.textContent = fullText;
+    _finishStreamingBubble(stream, data.provider, data.model);
+  }
+  conversationHistory.push({ role: "assistant", content: fullText });
+  setStatusDot("ready");
+  if (data.provider) {
+    updateProviderBadge(data.provider);
+  }
+  if (typeof voice !== "undefined" && voice.isTTSSupported) {
+    try {
+      voice.speak(fullText);
+    } catch (_) {}
+  }
+  appendDiagnostics(data.diagnostics);
+  return true;
+}
+
+
+/**
+ * Buffered POST /chat — the pre-M30 path, byte-identical behavior. Used as
+ * the fallback whenever streaming could not start.
+ */
+async function _sendBuffered(text, historyToSend) {
+  // --- Network phase: this try/catch guards ONLY the fetch + JSON parse.
+  // A rendering/TTS error later must NOT be reported as a network error (M26.10).
+  let res;
+  try {
+    res = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: text,
+        history: historyToSend,
+        conversation_id: conversationId, // M29.1 (null → server creates one)
+      }),
+    });
+  } catch (_) {
+    appendMessage("error", "Network error — could not reach the assistant.", null, null);
+    setStatusDot("error");
+    return; // sendMessage's finally still resets input state
+  }
+
+  if (!res.ok) {
+    // HTTP error (4xx / 5xx)
+    let detail = "Request failed (" + res.status + ").";
+    try {
+      const errBody = await res.json();
+      if (errBody && errBody.detail) detail = errBody.detail;
+    } catch (_) {}
+    appendMessage("error", detail, null, null);
+    setStatusDot("error");
+    return;
+  }
+
+  let data;
+  try {
+    data = await res.json();
+  } catch (_) {
+    appendMessage("error", "Received a malformed response from the assistant.", null, null);
+    setStatusDot("error");
+    return;
+  }
+
+  // --- Render phase (network already succeeded). ---
+  // M29.1: adopt the server's conversation id (first turn creates it).
+  if (data.conversation_id) {
+    conversationId = data.conversation_id;
+  }
+  if (data.success === false) {
+    // Provider returned a failure response — show as error style, but do NOT
+    // record it as an assistant turn (M26.10): otherwise "All providers
+    // failed." would be replayed to providers on every later message.
+    appendMessage("error", data.response, data.provider, data.model);
+    setStatusDot("error");
+  } else {
+    conversationHistory.push({ role: "assistant", content: data.response });
+    appendMessage("assistant", data.response, data.provider, data.model);
+    setStatusDot("ready");
+    if (data.provider) {
+      updateProviderBadge(data.provider);
+    }
+    // Speak the response if TTS is available. Guarded so a missing voice.js
+    // (or a speak() error) can't break the answer that already rendered.
+    if (typeof voice !== "undefined" && voice.isTTSSupported) {
+      try {
+        voice.speak(data.response);
+      } catch (_) {}
+    }
+  }
+
+  // M24/M24.5: diagnostics under the answer (summary + timeline + details)
+  appendDiagnostics(data.diagnostics);
+}
+
+
+/* ---------------------------------------------------------
+   SSE helpers (M30)
+   --------------------------------------------------------- */
+/**
+ * Parse complete SSE frames out of `buffer` (frames end with a blank line).
+ * Returns {frames: [{event, data}], rest} where rest is the unfinished tail
+ * to carry into the next read. Multi-`data:`-line frames are joined with \n
+ * per the SSE spec (the server emits single-line JSON, but be liberal).
+ */
+function _parseSSEFrames(buffer) {
+  const frames = [];
+  let idx;
+  while ((idx = buffer.indexOf("\n\n")) !== -1) {
+    const raw = buffer.slice(0, idx);
+    buffer = buffer.slice(idx + 2);
+    let event = "message";
+    const dataLines = [];
+    raw.split("\n").forEach(function (line) {
+      if (line.indexOf("event:") === 0) {
+        event = line.slice(6).trim();
+      } else if (line.indexOf("data:") === 0) {
+        dataLines.push(line.slice(5).replace(/^ /, ""));
+      }
+    });
+    if (dataLines.length) {
+      frames.push({ event: event, data: dataLines.join("\n") });
+    }
+  }
+  return { frames: frames, rest: buffer };
+}
+
+/**
+ * Create the growing assistant bubble for a streaming reply: the wrapper and
+ * bubble match appendMessage's DOM exactly, but the meta line is deferred to
+ * _finishStreamingBubble (provider/model are only known at `done`).
+ */
+function _beginStreamingBubble() {
+  const wrapper = document.createElement("div");
+  wrapper.className = "message-wrapper message-assistant";
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.textContent = "";
+  wrapper.appendChild(bubble);
+  messagesEl.appendChild(wrapper);
+  scrollToBottom();
+  return { wrapper: wrapper, bubble: bubble };
+}
+
+/** Attach the meta line (provider/model + timestamp) once the reply is done. */
+function _finishStreamingBubble(stream, provider, model) {
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  if (provider) {
+    const providerSpan = document.createElement("span");
+    providerSpan.className = "provider-label";
+    providerSpan.textContent = provider + (model ? " / " + model : "");
+    meta.appendChild(providerSpan);
+  }
+  const timeSpan = document.createElement("span");
+  timeSpan.className = "timestamp";
+  timeSpan.textContent = new Date().toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  meta.appendChild(timeSpan);
+  stream.wrapper.appendChild(meta);
 }
 
 

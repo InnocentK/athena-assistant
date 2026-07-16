@@ -4,6 +4,78 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [3.0.0] — Milestone 30 — Streaming
+
+**Major release.** Spec: `docs/specs/M30-streaming.md`. Responses render as
+they are generated on both surfaces; everything that can't stream degrades
+honestly to the buffered behavior. Major because the *delivery contract*
+changes (new `/chat/stream` endpoint is the web UI's default path; the CLI
+prints incrementally by default) — the buffered `POST /chat` remains,
+byte-compatible, as the safety net and the API contract for anything
+scripted against 2.x.
+
+### Added
+- **Adapters** — `ProviderAdapter.supports_streaming()` (default False) and
+  `complete_stream()` → yield text chunks, then the final ProviderResponse.
+  Implemented by `chatgpt` (with `stream_options={"include_usage": True}` —
+  usage lands on the final chunk), `ollama` and `grok` *api transport only*
+  (no `stream_options` — compat risk; usage recorded only if the server
+  volunteers it, honestly absent otherwise). CLI transports answer whole and
+  keep the default False. Error strings and client bounding
+  (`timeout=…, max_retries=0`) identical to `complete()`.
+- **Router** — `route_stream()`: the SAME attempt loop as `route()` (shared
+  `_build_attempt_order`/`_callable_attempts`/`_attempt_*` internals — the
+  routing logic is not forked), yielding `("chunk", text)` events then
+  exactly one `("done", ProviderResponse)`. Zero-chunk failures fall through
+  to the next provider exactly like `route()`; a failure AFTER chunks stops
+  the request (text cannot be un-emitted); non-streaming adapters degrade to
+  one buffered chunk + done. `on_attempt` (M27.0) and the M22 trace behave
+  identically in both modes.
+- **HTTP** — `POST /chat/stream` (SSE, `text/event-stream`): `event: chunk`
+  / `data: {"text": …}` frames, then one `event: done` whose payload mirrors
+  ChatResponse (+ `error`, for failures that occur after text was already
+  delivered). Same conversation_id validation/creation, user-turn record,
+  memory extraction, assistant-turn record (all complete BEFORE the done
+  frame), and total `_ROUTE_TIMEOUT` budget as `/chat`. The sync generator
+  is driven by per-step `asyncio.to_thread(next, it, sentinel)` against a
+  monotonic deadline (M26.5 — the loop stays responsive).
+- **Web UI** — `sendMessage` posts to `/chat/stream` first and grows the
+  assistant bubble as chunks arrive (`textContent` — XSS posture unchanged);
+  the done event supplies provider/model meta, diagnostics, history push,
+  TTS, and the authoritative full text. **Any failure before the first
+  chunk falls back to the buffered `/chat`** — the UI is never less reliable
+  than 2.x. Failures after chunks render the partial text plus an error
+  bubble and are never re-sent or recorded as context (M26.10).
+- **CLI** — streams by default: chunks print to stdout as they arrive (the
+  answer-only contract holds — the chunks ARE the answer; spinner stops at
+  the first chunk; status stays on stderr). New `--no-stream` flag keeps the
+  buffered pre-3.0 behavior — recommended for strict scripts, since a
+  provider dying mid-reply can leave a partial answer on stdout (the run
+  still exits 1 with the error on stderr). The REPL streams per turn the
+  same way.
+
+### Changed
+- **Empty output is now a failure on EVERY adapter, in BOTH modes**
+  (chatgpt / ollama / grok-api / grok-cli / gemini added here; hermes
+  always did; claude since M29.8): "<Provider> returned no output." The
+  router falls back to a provider that answers instead of returning a blank
+  success — and streaming's zero-chunk fallback depends on it. This is the
+  REVIEW-3.0 F14 norm applied uniformly for 3.0.
+
+### Notes
+- Diagnostics: a streaming attempt's `call_ms`/`duration_ms` include
+  delivery time (the generator is suspended at each yielded chunk) — the
+  user-perceived answer time, stated in `route_stream`'s docstring.
+- Client disconnect mid-stream abandons the turn: user turn kept, no
+  assistant turn recorded (the reply was never delivered).
+- Out of scope (unchanged from the spec): WebSockets, mid-stream token
+  ticking in the UI, streaming for CLI transports, SSE reconnect/resume.
+- Pre-release scoped diff-review of M30's own diff: addendum in
+  `docs/history/REVIEW-3.0-2026-07.md` (3 fixes applied, 4 observations
+  blessed, verdict: fit to ship).
+- Gate: ruff + mypy (8-error pre-existing stub baseline) + **593 pytest**
+  (coverage 77%, floor 74) + **28 vitest**. +49 Python / +6 JS tests.
+
 ## [Unreleased] — Milestone 29.9 — Remediation diff-review
 
 Docs only — **no code change; the app stays at 2.9.8**. Spec:

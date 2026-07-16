@@ -14,7 +14,10 @@ Two facts shape every row below:
   only Python and network. *CLI transports* (claude / gemini / grok / hermes)
   shell out to vendor command-line tools installed on the host, which must be
   present and logged in. Most platform caveats are really *CLI-transport*
-  caveats.
+  caveats. **Streaming (M30) is transport-dependent too:** API transports
+  stream token-by-token on every platform; CLI transports answer whole (a
+  subprocess's reply arrives at exit) and render buffered — expected behavior,
+  not a platform fault.
 - Athena is **single-user and has no auth layer** by design. It must never bind
   an untrusted network interface. Remote reach is the operator's responsibility
   (see [Remote access](#remote-access)).

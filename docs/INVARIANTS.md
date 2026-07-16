@@ -308,6 +308,58 @@ This file is the durable contract; per-release history lives in
   (`build_cli_usage`) — never a fabricated number.
 - Tests: `tests/test_provider_robustness.py`, `tests/test_provider_*`,
   `tests/test_diagnostics.py`, `tests/test_token_usage.py`.
+- **Empty output is a provider failure — every adapter, both modes (M30).**
+  "<Provider> returned no output." with `success=False`; the router falls
+  through to a provider that answers, and streaming's zero-chunk fallback
+  depends on it. A new adapter must implement this too; do not "fix" it back
+  to success-with-empty-string. Tests: `tests/test_streaming_adapters.py`.
+
+## Streaming (M30)
+
+- **One routing loop, two delivery modes.** `route()` and `route_stream()`
+  share `_build_attempt_order` / `_callable_attempts` / `_attempt_*` — never
+  fork the attempt logic between them (order, skips, diagnostics, errors list,
+  `on_attempt` all come from the shared internals). Parity is test-pinned.
+- **`route_stream()` yields `("chunk", str)`… then EXACTLY ONE
+  `("done", ProviderResponse)`, and never raises.** Every exit path — success,
+  zero-chunk failure fallthrough, failure-after-chunks stop, mid-stream
+  exception, contract-violating adapter, fallback-off, all-exhausted — ends in
+  one done event carrying the finalized M22 trace.
+- **Zero-chunk failures fall through; failures after chunks stop.** Text
+  cannot be un-emitted — switching providers mid-answer would splice two
+  models' prose. Keep this asymmetry.
+- **Adapter `complete_stream()` mirrors `complete()`'s defenses**: same error
+  strings, same bounded client (`timeout=…, max_retries=0`), failure
+  ProviderResponse instead of raising, empty assembled output → failure.
+  `supports_streaming()` must tell the truth (grok: True only on the api
+  transport); the router checks it before calling `complete_stream()`.
+  Usage is never fabricated: chatgpt asks via
+  `stream_options={"include_usage": True}`; grok/ollama do NOT send that
+  parameter (compat risk) and only record usage a server volunteers.
+- **`POST /chat/stream` = `/chat` semantics + SSE delivery.** Same
+  conversation-id validation (400 before any streaming), same user-turn
+  record before routing, same memory extraction and assistant-turn record —
+  both complete BEFORE the done frame is sent — same `_ROUTE_TIMEOUT` total
+  budget (monotonic deadline across `asyncio.to_thread(next, it, sentinel)`
+  steps; the sentinel keeps StopIteration out of the coroutine machinery).
+  Client disconnect abandons the turn: user turn kept, no assistant record.
+  The done payload mirrors ChatResponse fields (+ `error`). **The buffered
+  `POST /chat` stays byte-compatible** — it is the fallback surface and the
+  2.x API contract; never remove or alter it for streaming's benefit.
+- **The web UI falls back to `/chat` ONLY before the first chunk.** After
+  text has rendered, a failure shows the partial text + an error bubble and
+  is never re-sent (a silent re-send could double-charge a provider and
+  splice answers). Failure text is never pushed to context (M26.10 applies
+  unchanged).
+- **CLI streaming keeps stdout answer-only** — chunks ARE the answer; the
+  spinner stops at the first chunk; `--no-stream` preserves the buffered
+  behavior for strict scripts (a mid-reply death can leave partial stdout;
+  exit code is still 1 with the error on stderr). `drive_stream` returning
+  `final=None` (iterator ended without done) is a failure, not a success.
+- Tests: `tests/test_streaming_adapters.py`, `tests/test_router_stream.py`,
+  `tests/test_chat_stream.py`, `tests/js/streaming.test.js`, plus the M30
+  additions in `tests/test_cli.py` / `tests/test_cli_status.py` /
+  `tests/test_repl.py`.
 
 ## Calendar / DAV (M26.9)
 

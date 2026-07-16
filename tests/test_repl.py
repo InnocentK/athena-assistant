@@ -133,3 +133,26 @@ def test_bare_invocation_without_tty_is_still_usage_error(cli_env, monkeypatch, 
     with pytest.raises(SystemExit) as exc:
         main([])
     assert exc.value.code == 2
+
+
+def test_repl_streams_chunks_to_stdout_once(repl_env, monkeypatch, capsys):
+    """M30: the REPL's default path streams; the answer appears exactly once."""
+
+    class _ChunkedREPLRouter(_RecordingRouter):
+        def route_stream(self, messages, system_prompt, profile_config, on_attempt=None):
+            # two chunks + done, built from the recorded route() response
+            response = self.route(
+                messages, system_prompt, profile_config, on_attempt=on_attempt
+            )
+            half = len(response.content) // 2
+            yield ("chunk", response.content[:half])
+            yield ("chunk", response.content[half:])
+            yield ("done", response)
+
+    router = _ChunkedREPLRouter()
+    code = _run(monkeypatch, router, ["hello", "/exit"])
+    cap = capsys.readouterr()
+
+    assert code == 0
+    assert cap.out == "answer1\n"          # chunked, once, newline-terminated
+    assert len(router.calls) == 1

@@ -29,6 +29,7 @@ Cost tier: low
 from __future__ import annotations
 
 import os
+from typing import Iterator
 
 from providers.base import (
     Message,
@@ -169,6 +170,17 @@ class OllamaAdapter(ProviderAdapter):
             )
             content = response.choices[0].message.content or ""
             usage = extract_openai_usage(response)
+            # M30: empty output is a failure on every adapter, in both modes —
+            # the router falls back instead of returning a blank answer.
+            if not content.strip():
+                return ProviderResponse(
+                    success=False,
+                    content="",
+                    provider_name="ollama",
+                    model=model,
+                    error="Ollama returned no output.",
+                    metadata={"usage": usage} if usage else {},
+                )
             return ProviderResponse(
                 content=content,
                 provider_name="ollama",
@@ -201,3 +213,106 @@ class OllamaAdapter(ProviderAdapter):
                 model=model,
                 error=str(exc),
             )
+
+    # ------------------------------------------------------------------
+    # Streaming (M30)
+    # ------------------------------------------------------------------
+
+    def supports_streaming(self) -> bool:
+        return True
+
+    def complete_stream(
+        self,
+        messages: list[Message],
+        system_prompt: str | None = None,
+    ) -> "Iterator[str | ProviderResponse]":
+        """
+        Stream a completion (M30): yield text chunks, then the final
+        ProviderResponse (assembled content). Unlike chatgpt, no
+        ``stream_options={"include_usage": True}`` is sent — OpenAI-compat
+        servers vary in support and a rejected request parameter would break
+        streaming outright. If the server volunteers usage on a chunk anyway
+        it is recorded; otherwise usage is honestly absent. Error strings and
+        client bounding (timeout, max_retries=0) match complete().
+        """
+        try:
+            import openai  # noqa: PLC0415
+        except ImportError:
+            yield ProviderResponse(
+                success=False, content="", provider_name="ollama",
+                error="The 'openai' package is not installed. Run: pip install openai>=1.0",
+            )
+            return
+
+        model = _model()
+        if not model:
+            yield ProviderResponse(
+                success=False, content="", provider_name="ollama",
+                error="OLLAMA_MODEL is not set; configure a local model (e.g. gemma4, qwen3.6).",
+            )
+            return
+
+        base_url = _base_url()
+        timeout = _completion_timeout()
+        api_messages: list[dict[str, str]] = []
+        if system_prompt:
+            api_messages.append({"role": "system", "content": system_prompt})
+        for msg in messages:
+            api_messages.append({"role": msg.role, "content": msg.content})
+
+        parts: list[str] = []
+        usage = None
+        try:
+            client = openai.OpenAI(
+                base_url=base_url,
+                api_key=_api_key(),
+                timeout=timeout,
+                max_retries=0,
+            )
+            stream = client.chat.completions.create(
+                model=model,
+                messages=api_messages,  # type: ignore[arg-type]
+                stream=True,
+            )
+            for chunk in stream:
+                chunk_usage = extract_openai_usage(chunk)
+                if chunk_usage:
+                    usage = chunk_usage
+                choices = getattr(chunk, "choices", None) or []
+                if not choices:
+                    continue
+                delta = getattr(choices[0], "delta", None)
+                text = getattr(delta, "content", None) if delta is not None else None
+                if text:
+                    parts.append(text)
+                    yield text
+        except openai.APITimeoutError:
+            yield ProviderResponse(
+                success=False, content="", provider_name="ollama", model=model,
+                error=f"Timeout: Ollama did not respond within {timeout:g} seconds.",
+            )
+            return
+        except openai.APIConnectionError as exc:
+            yield ProviderResponse(
+                success=False, content="", provider_name="ollama", model=model,
+                error=f"Connection error: could not reach Ollama at {base_url}: {exc}",
+            )
+            return
+        except Exception as exc:  # noqa: BLE001 — base contract: never raise
+            yield ProviderResponse(
+                success=False, content="", provider_name="ollama", model=model,
+                error=str(exc),
+            )
+            return
+
+        content = "".join(parts)
+        if not content.strip():
+            yield ProviderResponse(
+                success=False, content="", provider_name="ollama", model=model,
+                error="Ollama returned no output.",
+            )
+            return
+        yield ProviderResponse(
+            content=content, provider_name="ollama", model=model, success=True,
+            metadata={"usage": usage} if usage else {},
+        )

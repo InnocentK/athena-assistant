@@ -94,6 +94,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print an expanded per-provider timing breakdown on stderr.",
     )
     parser.add_argument(
+        "--no-stream",
+        action="store_true",
+        help="Print the answer only when complete (M30). Streaming can leave a "
+        "partial answer on stdout if a provider dies mid-reply; use this for "
+        "strict scripting.",
+    )
+    parser.add_argument(
         "--doctor",
         action="store_true",
         help="Run preflight diagnostics (config/filesystem only) and exit. "
@@ -291,37 +298,58 @@ def main(argv: list[str] | None = None) -> int:
         build_cli_breakdown,
         build_cli_summary,
         build_cli_usage,
+        drive_stream,
         live_status_text,
         stream_is_tty,
     )
 
-    # In-flight feedback: a spinner on stderr while route() blocks. Disabled by
-    # --quiet and automatically silent when stderr isn't a TTY. M27.0: the
-    # router's on_attempt callback updates the label to the provider being tried
-    # right now (e.g. "Trying claude/cli…"), so a fall-through is visible live.
+    # In-flight feedback: a spinner on stderr while the route call runs.
+    # Disabled by --quiet and automatically silent when stderr isn't a TTY.
+    # M27.0: the router's on_attempt callback updates the label to the provider
+    # being tried right now, so a fall-through is visible live.
     spinner = Spinner("Working…", enabled=not args.quiet)
 
     def _on_attempt(info: dict) -> None:
         spinner.set_text(live_status_text(info))
 
+    # M30: stream by default — chunks print to stdout as they arrive (they ARE
+    # the answer). --no-stream keeps the buffered pre-3.0 behavior: nothing on
+    # stdout until the reply is complete (strict scripting; a stream that dies
+    # mid-reply can leave a partial answer on stdout).
+    printed_any = False
     spinner.start()
     try:
-        response = router.route(
-            messages, system_prompt, profile_config, on_attempt=_on_attempt
-        )
-    except Exception as exc:  # noqa: BLE001 — route() shouldn't raise, but be safe.
+        if args.no_stream:
+            response = router.route(
+                messages, system_prompt, profile_config, on_attempt=_on_attempt
+            )
+        else:
+            response, printed_any = drive_stream(
+                router.route_stream(
+                    messages, system_prompt, profile_config, on_attempt=_on_attempt
+                ),
+                spinner,
+            )
+    except Exception as exc:  # noqa: BLE001 — routing shouldn't raise, but be safe.
         spinner.stop()
         print(f"Error: provider call failed: {exc}", file=sys.stderr)
         return 1
     spinner.stop()
+
+    if response is None:
+        # Streaming iterator ended without a done event (contract violation).
+        print("Error: provider stream ended without a final response.", file=sys.stderr)
+        return 1
 
     if not response.success:
         message = response.error or response.content or "All providers failed."
         print(f"Error: {message}", file=sys.stderr)
         return 1
 
-    # The answer — and only the answer — goes to stdout.
-    print(response.content)
+    # The answer — and only the answer — goes to stdout. When streaming, the
+    # chunks already carried it (with a trailing newline, matching print()).
+    if not printed_any:
+        print(response.content)
 
     # Status feedback (stderr only, never stdout). The friendly one-liner shows
     # on an interactive TTY or when explicitly asked via --diagnostics; the

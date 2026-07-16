@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Iterator
 
 
 @dataclass
@@ -67,7 +67,30 @@ class ProviderAdapter(ABC):
       - declaring its name and cost tier
 
     The router only calls complete() on adapters where is_available() is True.
+
+    Streaming (M30): adapters that can deliver incremental output override
+    ``supports_streaming()`` to return True and implement
+    ``complete_stream()`` — a generator yielding text chunks (str) and
+    finishing with the final ``ProviderResponse`` (assembled full content;
+    usage best-effort). CLI subprocess adapters answer whole and keep the
+    default (False): the router degrades them to a single buffered chunk.
     """
+
+    def supports_streaming(self) -> bool:
+        """True iff this adapter implements ``complete_stream()`` (M30)."""
+        return False
+
+    def complete_stream(
+        self,
+        messages: "list[Message]",
+        system_prompt: str | None = None,
+    ) -> "Iterator[str | ProviderResponse]":
+        """
+        Stream a completion: yield text chunks, then the final
+        ``ProviderResponse`` (M30). Default: not supported — the router must
+        check ``supports_streaming()`` first and never reach this.
+        """
+        raise NotImplementedError(f"{self.name()} does not support streaming")
 
     @abstractmethod
     def name(self) -> str:

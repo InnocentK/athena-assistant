@@ -227,3 +227,87 @@ seeds real chat content and asserts byte-absence, not just name-absence.
 
 Gate at review time: ruff + mypy clean, 544 pytest @74 floor, 22 vitest.
 **Verdict: M29.8 faithful to its findings; the road to M30 is clear.**
+
+
+## Addendum — M30 pre-release diff-review (streaming, pre-bump @2.9.8)
+
+Scope: the pre-major review above could not cover code that did not yet
+exist, so per the agreed M30 structure this addendum reviews **M30's own
+diff** — providers/base.py, chatgpt.py, ollama.py, grok.py, gemini.py,
+providers/router.py, app/routers/core.py, static/js/chat.js, cli/status.py,
+cli/main.py, cli/repl.py, and the new/updated tests — through the same six
+lenses, before the version bump. Method: fresh line-level read of the
+assembled final files (not the edit deltas), adversarial walk of every
+route_stream fallback/stop path, cross-surface trace of the failure story
+(adapter → router event → SSE done frame → web/CLI rendering → history).
+
+**Applied fixes (found by this pass, in-milestone):**
+
+- **A3 — endpoint local shadowed the module's APIRouter.** `chat_stream`
+  bound `router = main._router` while every other line of the file uses
+  `router` for the APIRouter instance. Renamed to `provider_router`
+  (agent-ergonomics: one name, one meaning per file).
+- **A4 — adapter `complete_stream` signatures were unannotated.** Added the
+  base-matching annotations; that turned mypy's eyes onto the generator
+  bodies, which surfaced the SDK-overload looseness the buffered calls
+  already carry as `type: ignore[arg-type]` — now carried on the stream
+  call as `type: ignore[call-overload]` with a comment. Net: stream bodies
+  are type-checked; buffered/stream looseness is symmetrical and explicit.
+- **A5 — streaming timings were silently delivery-inclusive.** For a
+  streaming attempt, `call_ms`/`duration_ms` span first-call→final-response
+  and the router generator is suspended at each yielded chunk, so SSE write
+  and client consumption time are included. That is the user-perceived
+  answer time (right for the summary line) but not comparable to a buffered
+  attempt's pure provider latency — now stated in route_stream's docstring
+  rather than left for someone to discover in a latency investigation.
+
+**Observations, blessed (intended behavior, recorded here):**
+
+- **A6 — double `Spinner.stop()` on the CLI streaming path.**
+  `drive_stream` stops the spinner at the first chunk; the caller stops it
+  again after the iterator ends. The second stop re-writes `\r\033[K` to a
+  then-empty stderr line — invisible on a TTY, absent when piped. Keeping
+  the caller-side stop is what guarantees the spinner dies on the zero-chunk
+  and exception paths; blessed as the simpler invariant ("caller always
+  stops it; drive_stream additionally stops it early for display").
+- **A7 — client disconnect abandons the turn.** On SSE disconnect the
+  async generator is closed at its yield point: no assistant turn is
+  recorded (the reply was never delivered), the user turn remains, and the
+  orphaned worker-thread `next()` finishes into a dropped reference. Same
+  dangling-user-turn shape as a /chat timeout; documented in the endpoint
+  docstring. Untestable in TestClient without flaky thread choreography —
+  accepted untested, behavior documented.
+- **A8 — 400-then-fallback burns one request.** A stale/invalid
+  `conversation_id` 400s on /chat/stream, and the UI's fallback re-posts to
+  /chat, which 400s again and renders the detail. Two requests to surface
+  one error is the cost of "fallback must be unconditional before first
+  chunk" (the reliability invariant); blessed.
+- **A9 — `extract_memory` runs on failed streams too** (content=""), exactly
+  as /chat has always done; parity wins over cleverness.
+
+**Lens statements (checked, nothing found):** correctness — every
+route_stream exit yields exactly one done (all-fail, fallback-off, timeout,
+contract-violation paths each traced; parity tests pin route() vs
+route_stream()); security — no new secret paths, diagnostics stay
+content-free (chunk text goes to the client that asked for it, never into
+traces/logs), XSS posture unchanged (textContent everywhere, JSON.parse
+guarded), subprocess hardening untouched; concurrency — per-request
+generator state only, `_STREAM_DONE` sentinel keeps StopIteration out of
+the coroutine machinery, deadline math is monotonic, no shared-dict writes
+beyond the already-guarded diagnostics store; cross-surface — web/CLI/HTTP
+all consume the same route_stream events, both surfaces reconcile to the
+done response as authoritative, failure-after-chunks renders partial text +
+error on web and partial stdout + stderr error + exit 1 on CLI (documented
+under --no-stream for strict scripts); cross-adapter — empty output is now
+a failure on EVERY adapter in BOTH modes (chatgpt/ollama/grok-api/grok-cli/
+gemini added this milestone; hermes always, claude since M29.8), grok
+streams only on its api transport and says so via supports_streaming();
+test quality — 49 new tests use real generator fakes (not MagicMock
+auto-attrs) and SimpleNamespace SDK chunks so the defensive getattr walks
+are honestly exercised; split-frame SSE parse, zero-chunk vs after-chunk
+fallback, timeout, and 400 paths all pinned.
+
+Gate at addendum time (pre-bump, 2.9.8): ruff clean; mypy at the 8-error
+pre-existing caldav/ics-stub baseline (M26.21); **593 pytest** green,
+coverage 77% (floor 74); **28 vitest** green.
+**Verdict: M30's diff is fit to become 3.0.0.**

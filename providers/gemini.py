@@ -88,8 +88,17 @@ class GeminiAdapter(ProviderAdapter):
             )
 
         if result.returncode == 0:
+            content = result.stdout.strip()
+            # M30: empty output is a failure on every adapter (router falls back).
+            if not content:
+                return ProviderResponse(
+                    success=False,
+                    content="",
+                    provider_name="gemini",
+                    error="Gemini CLI returned no output.",
+                )
             return ProviderResponse(
-                content=result.stdout.strip(),
+                content=content,
                 provider_name="gemini",
                 success=True,
             )

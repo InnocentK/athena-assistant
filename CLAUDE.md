@@ -264,11 +264,20 @@ still applies):**
   review of its own diff before the final version-bump commit — the
   pre-major review gate applied to code that IS the major.
 
-*M30 — Streaming (epic, → 3.0.0).* SSE per-provider streaming for API
-transports; streamed rendering in the web UI; streamed stdout in the CLI. CLI
-transports degrade gracefully to today's one-shot behaviour (same honest-
-fallback pattern as token usage). This changes the `/chat` response contract —
-the reason it IS the major bump.
+- **M30 — Streaming** (→ **3.0.0**) — *shipped. Athena 3.0.0 is released.*
+  Adapters `complete_stream()` (chatgpt w/ include_usage; ollama + grok-api
+  without it — usage honest-absent), `route_stream()` on SHARED router
+  internals (zero-chunk failures fall through; failures after chunks stop),
+  `POST /chat/stream` SSE with `/chat`-identical semantics, web UI streams
+  with unconditional buffered fallback before the first chunk, CLI streams
+  stdout by default with `--no-stream` for strict scripts. Empty output is
+  now a failure on EVERY adapter in both modes (the F14 norm, uniform).
+  Pre-release scoped diff-review addendum in REVIEW-3.0 (the cadence rule
+  applied to the major's own diff). The buffered `POST /chat` is unchanged —
+  the 2.x compatibility surface. → `docs/specs/M30-streaming.md`
+
+**Athena 3.0.0 — the roadmap target — is shipped.** Post-3.0 work starts
+from the "Later / unscheduled" list below (spec first, as always).
 
 **Later / unscheduled:** Ollama phase 2 (multi-model, embeddings, tools);
 generic OpenAI-compatible local-provider abstraction; saved-items surfacing

@@ -7,6 +7,11 @@ import { bootChat } from "./loadChat.js";
 
 function fetchWith(chatResponder) {
   return (url, opts) => {
+    // M30: report the streaming endpoint unavailable so these buffered-path
+    // tests keep exercising POST /chat via the fallback.
+    if (typeof url === "string" && url.includes("/chat/stream")) {
+      return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({}) });
+    }
     if (typeof url === "string" && url.includes("/chat") && opts && opts.method === "POST") {
       return chatResponder(url, opts);
     }

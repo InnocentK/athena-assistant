@@ -11,14 +11,17 @@ stale module across the test suite's per-test main re-import).
 from __future__ import annotations
 
 import asyncio
+import json
 import re
-from typing import Any
+import time
+from typing import Any, AsyncIterator
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 
 from core.config import get_settings
 from core.logger import logger
-from providers.base import Message
+from providers.base import Message, ProviderResponse
 
 from app.models import (
     ChatRequest, ChatResponse,
@@ -358,6 +361,213 @@ async def chat(request: ChatRequest) -> ChatResponse:
         success=response.success,
         diagnostics=response.metadata.get("diagnostics"),  # M22 trace (content-free) or None
         conversation_id=conv_id,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Streaming chat (M30)
+# ---------------------------------------------------------------------------
+
+# Sentinel returned by next(it, _STREAM_DONE) so StopIteration never crosses
+# the thread boundary (StopIteration inside coroutine machinery is poison).
+_STREAM_DONE: Any = object()
+
+
+def _sse_frame(event: str, payload: dict[str, Any]) -> str:
+    """
+    One Server-Sent-Events frame: a named event with single-line JSON data.
+    json.dumps never emits raw newlines (they are escaped inside strings), so
+    the data field is always exactly one `data:` line.
+    """
+    return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+def _stream_done_payload(
+    response: "ProviderResponse", conv_id: str | None
+) -> dict[str, Any]:
+    """
+    The `done` event payload — mirrors ChatResponse (response/provider/model/
+    success/diagnostics/conversation_id) so clients can treat it exactly like
+    the buffered answer, plus `error` (streaming failures can occur after text
+    was already delivered, where the response body alone can't carry a reason).
+    """
+    return {
+        "response": response.content,
+        "provider": response.provider_name,
+        "model": response.model,
+        "success": response.success,
+        "diagnostics": response.metadata.get("diagnostics"),  # M22 trace or None
+        "error": response.error,
+        "conversation_id": conv_id,
+    }
+
+
+@router.post("/chat/stream", summary="Send a message; stream the reply as SSE (M30)")
+async def chat_stream(request: ChatRequest) -> StreamingResponse:
+    """
+    Streaming variant of POST /chat (M30). Emits Server-Sent Events:
+
+        event: chunk   data: {"text": "…"}            0..n, as text arrives
+        event: done    data: {ChatResponse fields}    exactly once, last
+
+    Semantics are /chat's: same conversation_id validation/creation, same
+    user-turn record before routing, same memory extraction and assistant-turn
+    record on completion (both finish BEFORE the done frame is sent), same
+    total _ROUTE_TIMEOUT budget. Non-streaming providers arrive as one chunk +
+    done. On timeout the done frame carries success=false and "The request
+    timed out." If the client disconnects mid-stream the request is abandoned
+    (no assistant turn is recorded — the reply was never delivered). The
+    buffered POST /chat is unchanged and remains the compatibility surface.
+    """
+    if main._router is None:
+        raise HTTPException(
+            status_code=503,
+            detail="ProviderRouter is not available. Check startup logs.",
+        )
+    # Bound after the guard: the provider router is process-lifetime (never
+    # re-bound by a profile switch, unlike _memory/_history), and the closure
+    # below runs after this handler returns, where mypy can't narrow
+    # main._router. Named provider_router: bare `router` is this module's
+    # APIRouter.
+    provider_router = main._router
+
+    from core.chat_turn import (  # noqa: PLC0415
+        build_turn_messages,
+        extract_memory,
+        record_turn,
+        system_prompt_from,
+    )
+    from history.manager import is_valid_conversation_id  # noqa: PLC0415
+
+    messages: list[Message] = build_turn_messages(
+        ((m.role, m.content) for m in request.history), request.message
+    )
+    system_prompt: str | None = system_prompt_from(main._profile_data)
+
+    # Conversation resolution + user-turn record: identical to /chat, and done
+    # BEFORE streaming starts so a bad id is a plain 400, not a broken stream.
+    conv_id: str | None = request.conversation_id
+    if conv_id is not None and not is_valid_conversation_id(conv_id):
+        raise HTTPException(status_code=400, detail="Invalid conversation_id.")
+    if main._history is not None:
+        try:
+            if conv_id is None:
+                conv_id = await asyncio.to_thread(main._history.new_conversation)
+        except Exception as exc:  # noqa: BLE001 — degrade to unpersisted chat
+            logger.warning("history unavailable for this turn (non-fatal): %s", exc)
+            conv_id = None
+        if conv_id is not None:
+            await asyncio.to_thread(
+                record_turn, main._history, conv_id, "user", request.message
+            )
+    else:
+        conv_id = None
+
+    async def event_source() -> AsyncIterator[str]:
+        # Total budget mirrors /chat: _ROUTE_TIMEOUT across ALL providers'
+        # attempts, however many chunks arrive. Each generator step runs in a
+        # worker thread (M26.5 — the sync router must not block the loop).
+        # CAVEAT (as /chat): a timed-out step's thread cannot be cancelled; the
+        # orphaned generator keeps running to the adapter's own limit and is
+        # discarded — we never touch the iterator again after abandoning it.
+        deadline = time.monotonic() + main._ROUTE_TIMEOUT
+        it = iter(
+            provider_router.route_stream(messages, system_prompt, main._profile_data)
+        )
+        response: "ProviderResponse | None" = None
+        try:
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise asyncio.TimeoutError
+                item = await asyncio.wait_for(
+                    asyncio.to_thread(next, it, _STREAM_DONE), timeout=remaining
+                )
+                if item is _STREAM_DONE:
+                    # Defensive: route_stream contractually ends with a done
+                    # event; ending without one is treated as a failure below.
+                    break
+                kind, payload = item
+                if kind == "chunk":
+                    yield _sse_frame("chunk", {"text": payload})
+                elif kind == "done":
+                    response = payload
+                    break
+        except asyncio.TimeoutError:
+            logger.error("Router timed out after %ss (chat/stream)", main._ROUTE_TIMEOUT)
+            yield _sse_frame(
+                "done",
+                {
+                    "response": "The request timed out.",
+                    "provider": "none",
+                    "model": None,
+                    "success": False,
+                    "diagnostics": None,
+                    "error": None,
+                    "conversation_id": conv_id,
+                },
+            )
+            return
+        except Exception as exc:  # noqa: BLE001 — mid-response: no 500 left to send
+            logger.error("chat/stream internal error: %s", exc)
+            yield _sse_frame(
+                "done",
+                {
+                    "response": "",
+                    "provider": "none",
+                    "model": None,
+                    "success": False,
+                    "diagnostics": None,
+                    "error": f"internal error: {exc}",
+                    "conversation_id": conv_id,
+                },
+            )
+            return
+
+        if response is None:  # generator ended without a done event (defensive)
+            response = ProviderResponse(
+                success=False,
+                content="",
+                provider_name="none",
+                error="stream ended without a final response",
+            )
+
+        # Post-turn bookkeeping BEFORE the done frame goes out — /chat's exact
+        # order (memory → assistant record → respond), so when the client sees
+        # `done` the conversation file already holds the turn.
+        if main._memory is not None:
+            try:
+                await asyncio.wait_for(
+                    asyncio.to_thread(
+                        extract_memory, main._memory, request.message, response.content
+                    ),
+                    timeout=main._AUTO_EXTRACT_TIMEOUT,
+                )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "auto_extract timed out after %ss (non-fatal)",
+                    main._AUTO_EXTRACT_TIMEOUT,
+                )
+        if conv_id is not None:
+            await asyncio.to_thread(
+                record_turn,
+                main._history,
+                conv_id,
+                "assistant",
+                response.content,
+                {
+                    "provider": response.provider_name,
+                    "model": response.model,
+                    "success": response.success,
+                },
+            )
+
+        yield _sse_frame("done", _stream_done_payload(response, conv_id))
+
+    return StreamingResponse(
+        event_source(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache"},
     )
 
 

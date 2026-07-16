@@ -6,10 +6,13 @@ prompts through configurable AI providers (CLI- and API-backed). All config,
 memory, and profile data live in plain local files — no cloud database, no auth
 layer. Designed to run in Docker on modest hardware.
 
-Features include multi-profile support, a YAML-backed memory system with a
-review queue, an allowlisted file browser, optional CalDAV / CardDAV / Nextcloud
-integrations (read-mostly, disabled by default), provider latency diagnostics,
-and editable settings.
+Features include **streamed responses** (answers render as they are generated,
+in the browser and the CLI — API-backed providers stream; CLI-backed providers
+answer whole and degrade gracefully), multi-profile support, a YAML-backed
+memory system with a review queue, persistent conversations, an allowlisted
+file browser with uploads, optional CalDAV / CardDAV / Nextcloud integrations
+(read-mostly, disabled by default), provider latency + token-usage
+diagnostics, and editable settings.
 
 ## Quick start
 
@@ -50,6 +53,7 @@ athena                                   # no prompt on a terminal → interacti
 athena history                           # list persisted conversations
 athena history export <id>               # conversation as Markdown on stdout (or --all)
 athena doctor                            # preflight checks: keys, CLIs, profile, dirs, disk
+athena --no-stream "..."                 # buffered output (streaming is the default; use for strict scripts)
 athena --list-providers                  # provider availability + effective transport
 ```
 

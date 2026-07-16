@@ -40,6 +40,7 @@ def run_repl(router: Any, profile_config: dict[str, Any], args: Any) -> int:
         Spinner,
         build_cli_summary,
         build_cli_usage,
+        drive_stream,
         live_status_text,
         stream_is_tty,
     )
@@ -151,16 +152,32 @@ def run_repl(router: Any, profile_config: dict[str, Any], args: Any) -> int:
         def _on_attempt(info: dict) -> None:
             spinner.set_text(live_status_text(info))  # noqa: B023 — rebound each turn
 
+        # M30: stream by default (chunks ARE the answer, printed as they
+        # arrive); --no-stream keeps the buffered pre-3.0 behavior per turn.
+        printed_any = False
         spinner.start()
         try:
-            response = router.route(
-                messages, system_prompt, profile_config, on_attempt=_on_attempt
-            )
+            if getattr(args, "no_stream", False):
+                response = router.route(
+                    messages, system_prompt, profile_config, on_attempt=_on_attempt
+                )
+            else:
+                response, printed_any = drive_stream(
+                    router.route_stream(
+                        messages, system_prompt, profile_config, on_attempt=_on_attempt
+                    ),
+                    spinner,
+                )
         except Exception as exc:  # noqa: BLE001 — never kill the session on one turn
             spinner.stop()
             print(f"Error: provider call failed: {exc}", file=sys.stderr)
             continue
         spinner.stop()
+
+        if response is None:
+            # Streaming iterator ended without a done event (contract violation).
+            print("Error: provider stream ended without a final response.", file=sys.stderr)
+            continue
 
         if store is not None and conv_id:
             record_turn(
@@ -174,8 +191,10 @@ def run_repl(router: Any, profile_config: dict[str, Any], args: Any) -> int:
             print(f"Error: {message}", file=sys.stderr)
             continue  # M26.10: a failure is never replayed into context
 
-        # The answer — and only the answer — goes to stdout.
-        print(response.content)
+        # The answer — and only the answer — goes to stdout (already printed
+        # chunk-by-chunk when streaming).
+        if not printed_any:
+            print(response.content)
 
         history.append(("assistant", response.content))
 

@@ -6,9 +6,14 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { bootChat, renderedMessages, lastBubbleText } from "./loadChat.js";
 
 // Build a fetch that answers the on-load /profile + /providers calls normally
-// and routes POST /chat to `chatResponder`.
+// and routes POST /chat to `chatResponder`. POST /chat/stream reports 404 so
+// sendMessage falls back to the buffered path — these are the buffered-path
+// (pre-M30) regression tests; tests/js/streaming.test.js covers the SSE path.
 function fetchWith(chatResponder) {
   return (url, opts) => {
+    if (typeof url === "string" && url.includes("/chat/stream")) {
+      return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({}) });
+    }
     if (typeof url === "string" && url.includes("/chat") && opts && opts.method === "POST") {
       return chatResponder(url, opts);
     }
