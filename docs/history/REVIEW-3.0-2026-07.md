@@ -191,3 +191,39 @@ This review also codifies the standing **review-cadence rule** into
 CLAUDE.md (full review before any major; scoped review at each epic close;
 scoped review after any autonomous batch ≥5 milestones), so the next "1,500
 lines in a night" run gets its fresh eyes without anyone asking.
+
+---
+
+## Addendum — M29.9 remediation diff-review (post-M29.8, commit 56204d0)
+
+Scoped fresh-eyes review of the M29.8 diff (~45 code lines) before M30, per
+the user-directed application of the cadence rule. Method: evidence pass on
+the final committed state (each fix greppably present, its inverse absent) +
+line-level scrutiny of the two subtle rewrites (claude parse, REPL flow)
+against edge cases.
+
+**Verified fix-by-fix:** F1 `"xb"` present, no `"wb"` in the write path,
+mkdir-before-open, handle closed and partial removed on the 413 path, 409 on
+suffix exhaustion raised before any handle exists. F2 user-append sits
+before the route call; `build_turn_messages` receives pre-append history so
+the turn is never doubled; `/new` and `/resume` interplay unchanged. F4/F14
+order verified (`is_error` at the top of the dict branch; empty checked in
+all three forms — plain, JSON `result`, empty stdout); non-dict JSON still
+degrades to raw-as-answer. F5 zero `clear()` in the switch path; prune
+iterates a key snapshot; the pre-validated non-empty `data` guarantees the
+dict can never empty. F6 the id regex now exists in exactly one module. F7
+seeds real chat content and asserts byte-absence, not just name-absence.
+
+**New findings: none.** Two observations, both BLESS:
+
+- **A1 — `is_error` strict-`True` check.** A truthy-but-not-`True`
+  `is_error` (e.g. the string `"true"`) does not trigger the failure path
+  and degrades to the answer. Consistent with the adapter's defensive
+  posture (unknown envelope dialects must not destroy answers); blessed.
+- **A2 — REPL exception-path parity.** When `route()` *raises* (as opposed
+  to returning a failure), the user turn is also kept — matching the web
+  UI's network-error path. The F2 parity therefore extends beyond the
+  tested returned-failure case; blessed, noted here as checked.
+
+Gate at review time: ruff + mypy clean, 544 pytest @74 floor, 22 vitest.
+**Verdict: M29.8 faithful to its findings; the road to M30 is clear.**

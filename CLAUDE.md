@@ -258,11 +258,11 @@ still applies):**
 - **M29.8 — review remediation** (→ 2.9.8) — *shipped.* All eight
   post-errata FIX findings implemented, each test-pinned (incl. a real
   two-thread upload race test). → `docs/specs/M29.8-review-remediation.md`
-- **M29.9 — remediation diff-review** (no bump) — scoped review of the
-  M29.8 diff (per the cadence rule's spirit, user-directed) as an addendum
-  to REVIEW-3.0. **M30 (→ 3.0.0) starts only after this.** M30 itself embeds
-  a scoped review of its own diff before the final version-bump commit —
-  the pre-major review gate applied to code that IS the major.
+- **M29.9 — remediation diff-review** (no bump) — *shipped.* M29.8 verified
+  fix-by-fix; no new findings; two observations blessed (addendum in
+  REVIEW-3.0). **M30 (→ 3.0.0) is clear to start** and embeds a scoped
+  review of its own diff before the final version-bump commit — the
+  pre-major review gate applied to code that IS the major.
 
 *M30 — Streaming (epic, → 3.0.0).* SSE per-provider streaming for API
 transports; streamed rendering in the web UI; streamed stdout in the CLI. CLI

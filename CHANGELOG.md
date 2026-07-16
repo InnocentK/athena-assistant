@@ -4,6 +4,17 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [Unreleased] — Milestone 29.9 — Remediation diff-review
+
+Docs only — **no code change; the app stays at 2.9.8**. Spec:
+`docs/specs/M29.9-remediation-review.md`. Scoped fresh-eyes review of the
+M29.8 diff (user-directed cadence-rule application): every fix verified
+against its finding in the final committed state; **no new findings**; two
+observations blessed (strict `is True` on `is_error`; REPL exception-path
+parity). Addendum in `docs/history/REVIEW-3.0-2026-07.md`. **M30 → 3.0.0 is
+clear to start** (and embeds a scoped review of its own diff before the
+version-bump commit).
+
 ## [2.9.8] — Milestone 29.8 — Review remediation
 
 **App bumped to 2.9.8.** Spec: `docs/specs/M29.8-review-remediation.md` —
