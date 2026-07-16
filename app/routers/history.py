@@ -13,6 +13,7 @@ import asyncio
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import PlainTextResponse
 
 import main  # noqa: E402  — call-time-safe via reload in main.py; see docstring
 
@@ -44,6 +45,49 @@ async def history_read(conversation_id: str) -> dict[str, Any]:
             status_code=404, detail=f"Conversation not found: {conversation_id}"
         ) from None
     return {"id": conversation_id, "turns": turns}
+
+
+@router.get(
+    "/history/conversations/{conversation_id}/export",
+    summary="Export one conversation as Markdown (M29.4)",
+)
+async def history_export(conversation_id: str) -> PlainTextResponse:
+    """Render the persisted turns as a downloadable Markdown document."""
+    store = _store()
+    try:
+        turns = await asyncio.to_thread(store.read, conversation_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid conversation id.") from None
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=404, detail=f"Conversation not found: {conversation_id}"
+        ) from None
+
+    lines = [f"# Conversation {conversation_id}", ""]
+    if turns:
+        lines += [f"Started: {turns[0].get('ts', 'unknown')}", ""]
+    for t in turns:
+        role = t.get("role")
+        if role == "user":
+            lines.append("## You")
+        else:
+            who = "Assistant"
+            provider = t.get("provider")
+            model = t.get("model")
+            if provider:
+                who += f" ({provider}{'/' + model if model else ''})"
+            if t.get("success") is False:
+                who += " *(failed)*"
+            lines.append(f"## {who}")
+        lines += ["", str(t.get("content", "")), ""]
+
+    return PlainTextResponse(
+        "\n".join(lines),
+        media_type="text/markdown",
+        headers={
+            "Content-Disposition": f'attachment; filename="{conversation_id}.md"'
+        },
+    )
 
 
 @router.delete("/history/conversations/{conversation_id}", summary="Delete one conversation")

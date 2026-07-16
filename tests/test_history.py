@@ -129,6 +129,39 @@ def test_history_endpoints_list_read_delete(client):
     assert client.get(f"/history/conversations/{conv}").status_code == 404
 
 
+def test_export_markdown_round_trip(client):
+    import main as app_module
+
+    app_module._router = _mock_router()
+    conv = client.post("/chat", json={"message": "export me", "history": []}).json()[
+        "conversation_id"
+    ]
+    resp = client.get(f"/history/conversations/{conv}/export")
+    assert resp.status_code == 200
+    assert "text/markdown" in resp.headers["content-type"]
+    assert f'{conv}.md"' in resp.headers["content-disposition"]
+    body = resp.text
+    assert f"# Conversation {conv}" in body
+    assert "## You" in body and "export me" in body
+    assert "## Assistant (mock/m1)" in body and "mock answer" in body
+
+    assert client.get("/history/conversations/nope/export").status_code == 404
+
+
+def test_export_flags_failed_turns(client):
+    import main as app_module
+
+    app_module._router = _mock_router()
+    conv = client.post("/chat", json={"message": "q", "history": []}).json()[
+        "conversation_id"
+    ]
+    app_module._history.append_turn(
+        conv, "assistant", "boom", {"provider": "mock", "success": False}
+    )
+    body = client.get(f"/history/conversations/{conv}/export").text
+    assert "*(failed)*" in body
+
+
 def test_profile_switch_repoints_history(client):
     import main as app_module
     from tests.test_profile_switch import _mk_profile

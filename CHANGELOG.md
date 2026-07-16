@@ -4,6 +4,25 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [2.9.4] — Milestone 29.4 — Conversation export
+
+**App bumped to 2.9.4 — the M29 Conversations epic is complete.** Spec:
+`docs/specs/M29.4-conversation-export.md`.
+
+### Added
+- **`GET /history/conversations/{id}/export`** — the persisted conversation
+  as Markdown (`text/markdown`, attachment `<id>.md`): title + started-at,
+  `## You` / `## Assistant (provider/model)` per turn, failed turns flagged
+  `*(failed)*`. Same 400/404 semantics as the read endpoint (the store's id
+  guard remains the single validation point).
+- **UI**: an Export button on each Past-conversations item.
+
+### Notes
+- Tests: export round-trip (headers + structure + both turns), failed-turn
+  flag, 404. Gate: ruff + mypy + 526 pytest + 22 vitest. **M29 shipped in
+  full: shared turn helper → persistent history → REPL → uploads → export.
+  Next: M30 — streaming → 3.0.0.**
+
 ## [2.9.3] — Milestone 29.3 — Real file uploads
 
 **App bumped to 2.9.3.** Spec: `docs/specs/M29.3-file-uploads.md`.

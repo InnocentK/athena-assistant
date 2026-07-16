@@ -1419,6 +1419,15 @@ async function _appendPastConversations(body) {
     item.addEventListener("click", function () {
       _loadPastConversation(c.id);
     });
+    // M29.4: per-conversation Markdown export (browser downloads the file).
+    const exportBtn = document.createElement("button");
+    exportBtn.className = "history-clear-btn";
+    exportBtn.textContent = "Export";
+    exportBtn.addEventListener("click", function (ev) {
+      ev.stopPropagation(); // don't also load the conversation
+      window.open("/history/conversations/" + encodeURIComponent(c.id) + "/export");
+    });
+    item.appendChild(exportBtn);
     body.appendChild(item);
   });
 }

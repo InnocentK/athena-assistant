@@ -217,8 +217,9 @@ still applies):**
   (sanitized names, streamed 10 MB cap, unique suffixes) into the allowlisted
   `data/uploads/`; 📎 UI attach inserts a path reference; reads stay
   allowlist-governed. → `docs/specs/M29.3-file-uploads.md`
-- **M29.4 — conversation export.** Markdown export of a conversation
-  (depends on M29.1).
+- **M29.4 — conversation export** (→ 2.9.4) — *shipped.* Markdown export
+  endpoint + UI button. **The M29 Conversations epic is complete.**
+  → `docs/specs/M29.4-conversation-export.md`
 
 *M30 — Streaming (epic, → 3.0.0).* SSE per-provider streaming for API
 transports; streamed rendering in the web UI; streamed stdout in the CLI. CLI
