@@ -4,6 +4,33 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [2.8.2] — Milestone 28.2 — Claude-CLI token usage (JSON envelope)
+
+The deferred M27.1 follow-up — **app bumped to 2.8.2**. Spec:
+`docs/specs/M28.2-claude-cli-usage.md`.
+
+### Added
+- **Claude CLI usage capture**: when the installed CLI advertises
+  `--output-format` (feature-detected once via `claude --help`, cached),
+  completions run with `--output-format json`; the envelope's `result` becomes
+  the answer, `model` is recorded, and `usage.input_tokens`/`output_tokens`
+  map onto `metadata["usage"]` (prompt/completion/total) — so the M27.1 UI and
+  CLI token surfaces now light up for Claude too.
+- **Defense throughout** (built without access to a real CLI — the mocked
+  suite pins the documented envelope): no flag in help → plain invocation
+  verbatim; non-JSON stdout or missing `result` → raw stdout is the answer, no
+  usage; `is_error: true` → provider failure with the result text; probe
+  failure → plain. The error path (non-zero exit/timeout) is byte-identical to
+  before.
+
+### Notes
+- **Morning validation (user TODO):** run
+  `claude -p "Say hi" --output-format json` and confirm the envelope has
+  `result` + `usage.input_tokens`/`output_tokens`. If it differs, Athena still
+  answers correctly via the fallbacks — send the real envelope so the parser
+  can be adjusted. Tests: `tests/test_claude_usage.py` (13). Gate: ruff + mypy
+  + 489 pytest + 21 vitest.
+
 ## [2.8.1] — Milestone 28.1 — Portable Profiles: import
 
 Second half of the **M28 epic** — **app bumped to 2.8.1**. Spec:

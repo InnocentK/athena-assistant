@@ -285,6 +285,12 @@ This file is the durable contract; per-release history lives in
   `transport()` on non-answer records; keep it in sync with `list_providers()`.
   A new dynamic-transport adapter should expose a `transport()` method.
   Availability is config-based (no network probe).
+- **Claude-CLI JSON mode must keep degrading (M28.2).** The adapter
+  feature-detects `--output-format` via a cached `claude --help` probe; every
+  envelope deviation (non-JSON stdout, missing `result`, probe failure) falls
+  back to plain-text success, and `is_error: true` maps to a provider failure.
+  Do not make JSON parsing strict — an envelope change in a future CLI must
+  degrade the metric, never the answer. Tests: `tests/test_claude_usage.py`.
 - **Token usage is counts-only (M27.1).** Adapters may put a `usage` dict of
   token *counts* into `response.metadata["usage"]` (API adapters via
   `extract_openai_usage`); the router copies it to `ProviderCallRecord.usage`.

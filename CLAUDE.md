@@ -174,11 +174,11 @@ still applies):**
 
 *The 2.8.z patch batch — small, independent mini-milestones, done BEFORE M29:*
 
-- **M28.2 — Claude-CLI token usage** (→ 2.8.2). The deferred M27.1 follow-up:
-  switch the Claude adapter to `--output-format json`, parse usage defensively,
-  fall back to plain text on any parse/flag failure (never break the primary
-  provider for a metric). **Must be validated against the real `claude` CLI on
-  the Mac** — the mocked suite can't confirm the envelope format.
+- **M28.2 — Claude-CLI token usage** (→ 2.8.2) — *shipped.* Feature-detected
+  JSON mode (`claude --help` probe, cached) with defensive envelope parsing;
+  every deviation degrades to plain text. **USER TODO: validate against the
+  real CLI** — `claude -p "Say hi" --output-format json` should show `result`
+  + `usage` keys. → `docs/specs/M28.2-claude-cli-usage.md`
 - **M28.3 — remote-access doc** (docs only, no bump). The fuller Tailscale/VPN +
   authenticated-reverse-proxy-TLS guidance; builds on `docs/PLATFORMS.md`
   (which stays the canonical matrix — link, don't restate). No code; no auth
