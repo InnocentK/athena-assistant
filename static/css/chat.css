@@ -84,7 +84,16 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  /* M28.4: dynamic viewport height — keeps the input above mobile browser
+     chrome; browsers without dvh keep the 100vh above. */
+  height: 100dvh;
   width: 100%;
+  /* M28.4: notched phones / PWA standalone — env() is 0 elsewhere. Requires
+     viewport-fit=cover on the template's viewport meta. */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 
@@ -1241,5 +1250,25 @@ body {
 
   #send-btn {
     padding: 8px 12px;
+  }
+
+  /* M28.4 — phone correctness layer (PWA / Tailscale-from-phone path). */
+
+  /* Side panels: 340px fixed leaves a dead sliver on a 375px screen. */
+  .memory-panel,
+  .settings-panel,
+  .history-panel {
+    width: 100%;
+  }
+
+  /* <16px input font makes iOS Safari zoom the page on focus. */
+  #message-input {
+    font-size: 16px;
+  }
+
+  /* Comfortable tap targets in the header. */
+  #header button {
+    min-height: 36px;
+    padding: 6px 10px;
   }
 }

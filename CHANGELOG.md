@@ -4,6 +4,31 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [2.8.4] — Milestone 28.4 — Mobile-responsive UI pass
+
+CSS + one viewport-meta attribute — **app bumped to 2.8.4**. Spec:
+`docs/specs/M28.4-mobile-ui-pass.md` (renumbered: shipped before the profile
+switcher/doctor, which become M28.5/M28.6 — milestone==version stays monotonic).
+
+### Changed
+- **Phone correctness layer** in the existing small-screen media query: the
+  three side panels (memory/settings/history) go full-width (was fixed 340px —
+  a dead sliver on a 375px screen), `#message-input` gets `font-size: 16px` on
+  phones (kills the iOS focus-zoom; desktop unchanged), header buttons get
+  36px+ tap targets.
+- **Viewport correctness**: `#app` gains `height: 100dvh` (input stays above
+  mobile browser chrome; older browsers keep `100vh`) and
+  `env(safe-area-inset-*)` padding for notched phones in PWA standalone;
+  template viewport meta gains `viewport-fit=cover` (required for env() to be
+  non-zero). Insets are 0 on non-notched devices — desktop is visually
+  unchanged.
+
+### Notes
+- Built without a physical phone: every rule is media-query-scoped or
+  zero-by-default. **USER TODO (morning):** open Athena on the phone over
+  Tailscale (and as the installed PWA) and eyeball; report anything off.
+  Gate: ruff + 489 pytest + 21 vitest.
+
 ## [Unreleased] — Milestone 28.3 — Remote-access doc
 
 Documentation only — **no code change; the app stays at 2.8.2**. Spec:

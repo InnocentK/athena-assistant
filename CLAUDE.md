@@ -182,14 +182,18 @@ still applies):**
 - **M28.3 — remote-access doc** (docs only, no bump) — *shipped.*
   `docs/REMOTE-ACCESS.md`: Tailscale/VPN + reverse-proxy-TLS how-tos,
   anti-patterns, verification. No code; no auth layer in Athena, ever.
-- **M28.4 — profile switcher** (→ 2.8.4). Activate a different profile at
+- **M28.4 — mobile-responsive UI pass** (→ 2.8.4) — *shipped* (renumbered:
+  smallest, done first). Full-width panels on phones, 16px input (no iOS
+  focus-zoom), `100dvh`, safe-area insets + `viewport-fit=cover`. **USER TODO:
+  eyeball on the phone.** → `docs/specs/M28.4-mobile-ui-pass.md`
+- **M28.5 — profile switcher** (→ 2.8.5). Activate a different profile at
   runtime (endpoint + UI dropdown) instead of editing `ACTIVE_PROFILE` +
   restart. Completes M28: imported portable profiles become usable in-app.
-- **M28.5 — `athena doctor`** (→ 2.8.5). Preflight diagnostics CLI: `.env` keys
+  CAREFUL: reinitializes `_profile_data`/`_memory`/`_saved` — read the
+  concurrency + settings INVARIANTS first.
+- **M28.6 — `athena doctor`** (→ 2.8.6). Preflight diagnostics CLI: `.env` keys
   present, vendor CLIs found/logged-in, DAV reachability, versions, disk. The
   executable form of the M26.27 platform matrix.
-- **M28.6 — mobile-responsive UI pass** (→ 2.8.6). CSS-only responsive layout
-  for the phone-over-Tailscale + PWA (M26.28) path. No logic changes.
 
 *M29 — Conversations (epic, 2.9.x) — in dependency order:*
 
