@@ -184,9 +184,19 @@ def main(argv: list[str] | None = None) -> int:
         return run_doctor()
 
     # Usage validation that needs no Athena imports: the ask path requires a
-    # prompt, but --list-providers does not.
+    # prompt, but --list-providers does not. M29.2: a bare `athena` on an
+    # interactive stdin drops into the REPL instead; scripts/pipes (non-TTY)
+    # keep the exit-2 usage error so nothing can hang waiting for input.
+    wants_repl = False
     if not args.list_providers and (args.prompt is None or not args.prompt.strip()):
-        parser.error("a prompt is required (or use --list-providers)")
+        try:
+            stdin_tty = sys.stdin.isatty()
+        except Exception:  # noqa: BLE001 — odd stdin counts as non-interactive
+            stdin_tty = False
+        if stdin_tty:
+            wants_repl = True
+        else:
+            parser.error("a prompt is required (or use --list-providers)")
 
     # Resolve the profile BEFORE importing Athena modules: get_settings() is
     # @lru_cache'd, so the override must be set first. M28.5: --profile sets
@@ -253,6 +263,13 @@ def main(argv: list[str] | None = None) -> int:
         routing["mode"] = args.mode
     if args.provider:
         routing["preferred_provider"] = args.provider
+
+    # M29.2: bare interactive invocation → the multi-turn REPL (which reuses
+    # this same stack: router, overrides, shared turn helpers, history).
+    if wants_repl:
+        from cli.repl import run_repl  # noqa: PLC0415
+
+        return run_repl(router, profile_config, args)
 
     # One-shot: a single user turn, system prompt from the profile — assembled
     # via the shared turn helper (M29.0), one code path with /chat.

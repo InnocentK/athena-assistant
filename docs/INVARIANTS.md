@@ -384,6 +384,10 @@ This file is the durable contract; per-release history lives in
 - **CLI stdout is answer-only**; all logs/status/diagnostics go to stderr. The
   M27.0 live status line (`Spinner.set_text` driven by the router's `on_attempt`
   callback) is stderr-only and TTY-gated — do not route any of it to stdout.
+  The M29.2 REPL keeps the same contract (the `you>` prompt itself is stderr),
+  and its **entry is TTY-gated**: bare `athena` with a non-TTY stdin must stay
+  a usage error (exit 2) so scripts can never hang in an input loop. REPL
+  history replays a turn **only on success** (M26.10, CLI edition).
 - **`route(on_attempt=…)` is measure-only (M27.0).** The progress callback fires
   before each available provider is called and is wrapped so any exception is
   swallowed — it must never influence routing, the attempt order, or the result

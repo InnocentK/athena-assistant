@@ -4,6 +4,32 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [2.9.2] — Milestone 29.2 — CLI REPL
+
+**App bumped to 2.9.2.** Spec: `docs/specs/M29.2-cli-repl.md`.
+
+### Added
+- **Interactive multi-turn REPL** (`cli/repl.py`): bare `athena` on an
+  interactive stdin drops into a session — accumulated in-session history
+  (replayed **only on success**, the M26.10 rule applied to the CLI), the
+  M27 live-status spinner + summary/usage lines per turn, best-effort memory
+  extraction, and **persistent history**: every REPL conversation is recorded
+  to the M29.1 `ConversationStore` (visible in the web UI's Past
+  conversations). Commands: `/new` (fresh conversation), `/exit`/`/quit`/EOF.
+- **TTY-gated entry**: with stdin not a TTY (scripts, pipes, CI) the bare
+  invocation stays a usage error (exit 2) — nothing can hang waiting for
+  input, and the established one-shot behavior is untouched.
+- **stdout stays answer-only** even in a session: the `you>` prompt, status,
+  usage, and errors all print to stderr (M25 contract), so piping a REPL
+  transcript yields clean answers.
+
+### Notes
+- Plain `input()` — no readline/TUI dependency. Streaming arrives in M30.
+  Tests: `tests/test_repl.py` (5, scripted stdin): history accumulation,
+  `/new` reset + one file per conversation, failure not replayed but
+  persisted with `success:false`, EOF clean exit, non-TTY bare invocation
+  still exit 2. Gate: ruff + mypy + 518 pytest + 22 vitest.
+
 ## [2.9.1] — Milestone 29.1 — Persistent cross-session history
 
 **App bumped to 2.9.1.** Spec: `docs/specs/M29.1-persistent-history.md`.

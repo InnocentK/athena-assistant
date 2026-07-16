@@ -1,0 +1,151 @@
+"""
+cli/repl.py — interactive multi-turn CLI session (M29.2).
+
+Entered by bare ``athena`` on an interactive stdin (TTY); scripts and pipes
+never land here (non-TTY bare invocation stays a usage error). One turn
+pipeline, shared with the one-shot path and the web surface via M29.0/29.1:
+``build_turn_messages`` + spinner/live status + ``record_turn`` persistence +
+``extract_memory``.
+
+Output contract (M25, unchanged): STDOUT carries ONLY answers — the ``you>``
+input prompt, status, usage, and errors all go to STDERR, so piping a REPL
+transcript still yields clean answer text.
+
+History rules: a turn is replayed into later context ONLY on success (M26.10);
+failed turns are persisted with ``success: false`` meta but never re-sent.
+``/new`` starts a fresh in-session history + persisted conversation;
+``/exit``, ``/quit``, or EOF end the session.
+"""
+
+from __future__ import annotations
+
+import sys
+from typing import Any
+
+_HELP = "Commands: /new (fresh conversation), /exit or /quit (leave). Ctrl-D exits."
+
+
+def run_repl(router: Any, profile_config: dict[str, Any], args: Any) -> int:
+    """Run the interactive loop. Returns the process exit code."""
+    from core.chat_turn import (  # noqa: PLC0415
+        build_turn_messages,
+        extract_memory,
+        record_turn,
+        system_prompt_from,
+    )
+    from cli.status import (  # noqa: PLC0415
+        Spinner,
+        build_cli_summary,
+        build_cli_usage,
+        live_status_text,
+        stream_is_tty,
+    )
+
+    # Persistent history (M29.1) — best-effort: a store failure degrades to an
+    # unpersisted session, never blocks the REPL.
+    store = None
+    conv_id: str | None = None
+    try:
+        from core.config import active_profile_dir  # noqa: PLC0415
+        from history.manager import ConversationStore  # noqa: PLC0415
+
+        store = ConversationStore(active_profile_dir())
+        conv_id = store.new_conversation()
+    except Exception as exc:  # noqa: BLE001
+        print(f"(history unavailable: {exc})", file=sys.stderr)
+
+    memory = None
+    if not args.no_memory:
+        try:
+            from core.config import active_profile_dir  # noqa: PLC0415
+            from memory.manager import MemoryManager  # noqa: PLC0415
+
+            memory = MemoryManager(active_profile_dir(), profile_config)
+        except Exception:  # noqa: BLE001 — memory stays best-effort
+            memory = None
+
+    system_prompt = system_prompt_from(profile_config)
+    history: list[tuple[str, str]] = []
+
+    name = profile_config.get("name", "Athena")
+    print(f"{name} REPL — {_HELP}", file=sys.stderr)
+
+    while True:
+        # Prompt on stderr: stdout must stay answer-only even in a transcript.
+        print("you> ", end="", file=sys.stderr, flush=True)
+        try:
+            text = input()
+        except (EOFError, KeyboardInterrupt):
+            print("", file=sys.stderr)
+            return 0
+
+        text = text.strip()
+        if not text:
+            continue
+        if text in ("/exit", "/quit"):
+            return 0
+        if text == "/new":
+            history = []
+            if store is not None:
+                try:
+                    conv_id = store.new_conversation()
+                except Exception:  # noqa: BLE001
+                    conv_id = None
+            print("(new conversation)", file=sys.stderr)
+            continue
+        if text.startswith("/"):
+            print(_HELP, file=sys.stderr)
+            continue
+
+        messages = build_turn_messages(history, text)
+        if store is not None and conv_id:
+            record_turn(store, conv_id, "user", text)
+
+        spinner = Spinner("Working…", enabled=not args.quiet)
+
+        def _on_attempt(info: dict) -> None:
+            spinner.set_text(live_status_text(info))  # noqa: B023 — rebound each turn
+
+        spinner.start()
+        try:
+            response = router.route(
+                messages, system_prompt, profile_config, on_attempt=_on_attempt
+            )
+        except Exception as exc:  # noqa: BLE001 — never kill the session on one turn
+            spinner.stop()
+            print(f"Error: provider call failed: {exc}", file=sys.stderr)
+            continue
+        spinner.stop()
+
+        if store is not None and conv_id:
+            record_turn(
+                store, conv_id, "assistant", response.content,
+                {"provider": response.provider_name, "model": response.model,
+                 "success": response.success},
+            )
+
+        if not response.success:
+            message = response.error or response.content or "All providers failed."
+            print(f"Error: {message}", file=sys.stderr)
+            continue  # M26.10: a failure is never replayed into context
+
+        # The answer — and only the answer — goes to stdout.
+        print(response.content)
+
+        history.append(("user", text))
+        history.append(("assistant", response.content))
+
+        if not args.quiet:
+            diagnostics = (
+                response.metadata.get("diagnostics")
+                if isinstance(response.metadata, dict)
+                else None
+            )
+            summary = build_cli_summary(diagnostics)
+            if summary and (stream_is_tty(sys.stderr) or args.diagnostics):
+                print(summary, file=sys.stderr)
+                usage_line = build_cli_usage(diagnostics)
+                if usage_line:
+                    print(usage_line, file=sys.stderr)
+
+        extract_memory(memory, text, response.content)

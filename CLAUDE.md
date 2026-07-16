@@ -209,8 +209,10 @@ still applies):**
   `/chat` records + returns `conversation_id`, `/history/*` endpoints, UI
   past-conversations restore. `profiles/*/history/` gitignored; portable
   bundles exclude it. → `docs/specs/M29.1-persistent-history.md`
-- **M29.2 — CLI REPL.** `athena` with no prompt → interactive multi-turn
-  session (leans on M27 live status + M29.0/29.1).
+- **M29.2 — CLI REPL** (→ 2.9.2) — *shipped.* Bare `athena` on a TTY →
+  multi-turn session (`cli/repl.py`): success-only history replay, per-turn
+  live status/usage, persisted to the M29.1 store, `/new` `/exit`. Non-TTY
+  bare invocation stays exit-2. → `docs/specs/M29.2-cli-repl.md`
 - **M29.3 — real file uploads.** Attach a file to a turn; policed by the
   existing files allowlist.
 - **M29.4 — conversation export.** Markdown export of a conversation
