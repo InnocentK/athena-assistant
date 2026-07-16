@@ -21,6 +21,8 @@ class ChatMessageInput(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     history: list[ChatMessageInput] = []
+    # M29.1: continue a persisted conversation; absent → a new one is created.
+    conversation_id: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -32,6 +34,9 @@ class ChatResponse(BaseModel):
     # text-only status/summary. None when diagnostics are disabled (M22 config).
     # M24.5 builds its richer UI from this same field — no backend change needed.
     diagnostics: dict[str, Any] | None = None
+    # M29.1: the persisted conversation this turn was recorded to (None when
+    # history is unavailable).
+    conversation_id: Optional[str] = None
 
 
 class MemoryCreateRequest(BaseModel):

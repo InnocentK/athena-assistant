@@ -18,6 +18,9 @@
    State
    --------------------------------------------------------- */
 let conversationHistory = []; // [{role, content}, ...]
+// M29.1: the persisted conversation id — captured from the first /chat
+// response, sent with every later turn so the server appends to one file.
+let conversationId = null;
 let assistantName = "Athena";
 let isThinking = false;
 
@@ -205,7 +208,11 @@ async function sendMessage() {
       res = await fetch("/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, history: historyToSend }),
+        body: JSON.stringify({
+          message: text,
+          history: historyToSend,
+          conversation_id: conversationId, // M29.1 (null → server creates one)
+        }),
       });
     } catch (_) {
       appendMessage("error", "Network error — could not reach the assistant.", null, null);
@@ -235,6 +242,10 @@ async function sendMessage() {
     }
 
     // --- Render phase (network already succeeded). ---
+    // M29.1: adopt the server's conversation id (first turn creates it).
+    if (data.conversation_id) {
+      conversationId = data.conversation_id;
+    }
     if (data.success === false) {
       // Provider returned a failure response — show as error style, but do NOT
       // record it as an assistant turn (M26.10): otherwise "All providers
@@ -1335,10 +1346,81 @@ function loadHistoryConversation() {
     });
     body.appendChild(item);
   });
+
+  _appendPastConversations(body);
+}
+
+/**
+ * M29.1 — list persisted conversations under the live view; click restores one
+ * into the chat (and resumes appending to it). Token-guarded like every async
+ * panel loader (M26.10).
+ */
+async function _appendPastConversations(body) {
+  const token = _panelLoadToken.history;
+  let convs = [];
+  try {
+    const res = await fetch("/history/conversations");
+    if (res.ok) convs = await res.json();
+  } catch (_) {
+    return; // history unavailable — panel simply shows the live view only
+  }
+  if (token !== _panelLoadToken.history) return; // superseded
+  if (!Array.isArray(convs) || convs.length === 0) return;
+
+  const title = document.createElement("div");
+  title.className = "history-role";
+  title.textContent = "Past conversations";
+  body.appendChild(title);
+
+  convs.forEach(function (c) {
+    const item = document.createElement("div");
+    item.className = "history-item";
+    const roleEl = document.createElement("div");
+    roleEl.className = "history-role";
+    roleEl.textContent = (c.started_at || c.id) + " · " + c.turns + " turns";
+    const previewEl = document.createElement("div");
+    previewEl.className = "history-preview";
+    previewEl.textContent = c.preview || "(no preview)";
+    item.appendChild(roleEl);
+    item.appendChild(previewEl);
+    item.addEventListener("click", function () {
+      _loadPastConversation(c.id);
+    });
+    body.appendChild(item);
+  });
+}
+
+/** Restore a persisted conversation into the chat window and resume it. */
+async function _loadPastConversation(id) {
+  let data;
+  try {
+    const res = await fetch("/history/conversations/" + encodeURIComponent(id));
+    if (!res.ok) return;
+    data = await res.json();
+  } catch (_) {
+    return;
+  }
+  const turns = Array.isArray(data.turns) ? data.turns : [];
+  conversationHistory = [];
+  conversationId = id;
+  if (messagesEl) messagesEl.textContent = "";
+  turns.forEach(function (t) {
+    if (t.role !== "user" && t.role !== "assistant") return;
+    // Failed assistant turns render as errors and are NOT replayed as context
+    // (the M26.10 rule, applied to restored history too).
+    if (t.role === "assistant" && t.success === false) {
+      appendMessage("error", t.content || "", t.provider || null, t.model || null);
+      return;
+    }
+    conversationHistory.push({ role: t.role, content: t.content || "" });
+    appendMessage(t.role, t.content || "", t.provider || null, t.model || null);
+  });
+  document.getElementById("history-panel").classList.add("hidden");
 }
 
 function clearConversation() {
   conversationHistory = [];
+  conversationId = null; // M29.1: next send starts a fresh persisted conversation
   if (messagesEl) {
     messagesEl.textContent = "";
   }

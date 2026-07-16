@@ -97,7 +97,8 @@ app/models.py               Pydantic request/response models (M26.18)
 app/routers/<domain>.py     one APIRouter per domain (M26.18) — handlers reach
                             main state via `main.` after `import main`
 core/{config,loader,logger} APP_ROOT/Settings, YAML I/O, logging
-core/chat_turn.py           shared turn assembly + memory-extract core (M29.0)
+core/chat_turn.py           shared turn assembly + memory/history cores (M29.0/.1)
+history/manager.py          per-profile JSONL conversation store (M29.1)
 core/version.py             __version__ — the single bump site
 core/urlguard.py            DAV same-origin guard (M26.13)
 providers/                  router.py + adapters (claude/gemini/chatgpt/grok/ollama/hermes/chatgpt_cli)
@@ -203,9 +204,11 @@ still applies):**
   `core/chat_turn.py` (`build_turn_messages` / `system_prompt_from` /
   `extract_memory`); both surfaces rewired, execution models untouched.
   → `docs/specs/M29.0-chat-turn-helper.md`
-- **M29.1 — persistent cross-session history.** Conversations survive restarts
-  as plain local files. Chat history stays OUT of portable bundles (M28
-  striplist — already an invariant).
+- **M29.1 — persistent cross-session history** (→ 2.9.1) — *shipped.*
+  `history/manager.py` (JSONL per conversation, id-guarded, lock-guarded),
+  `/chat` records + returns `conversation_id`, `/history/*` endpoints, UI
+  past-conversations restore. `profiles/*/history/` gitignored; portable
+  bundles exclude it. → `docs/specs/M29.1-persistent-history.md`
 - **M29.2 — CLI REPL.** `athena` with no prompt → interactive multi-turn
   session (leans on M27 live status + M29.0/29.1).
 - **M29.3 — real file uploads.** Attach a file to a turn; policed by the

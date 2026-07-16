@@ -134,6 +134,10 @@ async def profiles_activate(body: ProfileActivateRequest) -> dict[str, Any]:
         main._profile_data.update(data)
         main._memory = MemoryManager(active_profile_dir(), main._profile_data)
         main._saved = SavedItemsManager(active_profile_dir())
+        # M29.1: conversations are per-profile too.
+        from history.manager import ConversationStore  # noqa: PLC0415
+
+        main._history = ConversationStore(active_profile_dir())
 
     await asyncio.to_thread(_switch)
     logger.info("Profile switched to '%s' (runtime, M28.5).", name)
@@ -255,12 +259,36 @@ async def chat(request: ChatRequest) -> ChatResponse:
 
     # Build the full message list from history + the new user message via the
     # shared turn helper (M29.0) — one assembly path with the CLI.
-    from core.chat_turn import build_turn_messages, system_prompt_from  # noqa: PLC0415
+    from core.chat_turn import (  # noqa: PLC0415
+        build_turn_messages,
+        record_turn,
+        system_prompt_from,
+    )
 
     messages: list[Message] = build_turn_messages(
         ((m.role, m.content) for m in request.history), request.message
     )
     system_prompt: str | None = system_prompt_from(main._profile_data)
+
+    # Persistent history (M29.1): resolve/create the conversation, record the
+    # user turn before routing. All best-effort — history must never block or
+    # fail a chat.
+    conv_id: str | None = request.conversation_id
+    if conv_id is not None and not re.match(r"^[A-Za-z0-9_-]+$", conv_id):
+        raise HTTPException(status_code=400, detail="Invalid conversation_id.")
+    if main._history is not None:
+        try:
+            if conv_id is None:
+                conv_id = await asyncio.to_thread(main._history.new_conversation)
+        except Exception as exc:  # noqa: BLE001 — degrade to unpersisted chat
+            logger.warning("history unavailable for this turn (non-fatal): %s", exc)
+            conv_id = None
+        if conv_id is not None:
+            await asyncio.to_thread(
+                record_turn, main._history, conv_id, "user", request.message
+            )
+    else:
+        conv_id = None
 
     # M26.5: route() is synchronous (subprocess/network); run it in a worker
     # thread so the event loop stays responsive, with a bounded request time.
@@ -300,12 +328,28 @@ async def chat(request: ChatRequest) -> ChatResponse:
         except asyncio.TimeoutError:
             logger.warning("auto_extract timed out after %ss (non-fatal)", main._AUTO_EXTRACT_TIMEOUT)
 
+    # Record the assistant turn (M29.1) — best-effort, after routing.
+    if conv_id is not None:
+        await asyncio.to_thread(
+            record_turn,
+            main._history,
+            conv_id,
+            "assistant",
+            response.content,
+            {
+                "provider": response.provider_name,
+                "model": response.model,
+                "success": response.success,
+            },
+        )
+
     return ChatResponse(
         response=response.content,
         provider=response.provider_name,
         model=response.model,
         success=response.success,
         diagnostics=response.metadata.get("diagnostics"),  # M22 trace (content-free) or None
+        conversation_id=conv_id,
     )
 
 

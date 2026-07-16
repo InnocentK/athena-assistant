@@ -4,6 +4,38 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [2.9.1] — Milestone 29.1 — Persistent cross-session history
+
+**App bumped to 2.9.1.** Spec: `docs/specs/M29.1-persistent-history.md`.
+Conversations now survive restarts as plain local files.
+
+### Added
+- **`history/manager.py`** (new package, declared in pyproject per M26.4):
+  `ConversationStore` — append-only JSONL per conversation under
+  `profiles/<name>/history/`, lock-guarded (worker-thread appends), ids
+  validated `^[A-Za-z0-9_-]+$` **before any path build** (traversal guard);
+  malformed lines skipped on read. `record_turn` joins the chat-turn helpers
+  (same never-fail-a-turn contract as `extract_memory`).
+- **`/chat`**: optional `conversation_id` in (400 on bad format; absent → a
+  new conversation), returned in the response; user turn recorded before
+  routing, assistant turn after (provider/model/success meta). History is
+  best-effort throughout — store failure degrades to an unpersisted chat.
+- **Endpoints**: `GET /history/conversations` (newest-first summaries with
+  first-message preview), `GET/DELETE /history/conversations/{id}`.
+- **UI**: the chat threads `conversation_id` automatically (Clear starts a
+  fresh one); the History panel lists **Past conversations** — click restores
+  the turns into the chat (failed turns render as errors and are NOT replayed
+  as context, the M26.10 rule) and resumes that conversation.
+- **Privacy**: `profiles/*/history/` is **gitignored** (chat text never lands
+  in the repo); portable bundles (M28) already exclude it by allowlist
+  construction. Full backups include it by design (same-host restore).
+
+### Notes
+- Profile switching re-points the store (test-pinned). CLI recording joins in
+  M29.2 (REPL). Tests: `tests/test_history.py` (7) + jsdom threading test.
+  Editable install re-verified from outside the tree (new package). Gate:
+  ruff + mypy + 513 pytest + 22 vitest.
+
 ## [2.9.0] — Milestone 29.0 — Shared chat-turn helper
 
 **App bumped to 2.9.0 — the M29 Conversations epic begins.** Spec:

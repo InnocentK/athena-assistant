@@ -48,6 +48,28 @@ def system_prompt_from(profile: dict[str, Any]) -> str | None:
     return profile.get("system_prompt") or None
 
 
+def record_turn(
+    store: Any,
+    conversation_id: str,
+    role: str,
+    content: str,
+    meta: "dict[str, Any] | None" = None,
+) -> bool:
+    """
+    Best-effort history recording (M29.1) — same contract as
+    ``extract_memory``: a history write must NEVER fail an answered turn.
+    Returns True iff the turn was recorded.
+    """
+    if store is None or not conversation_id:
+        return False
+    try:
+        store.append_turn(conversation_id, role, content, meta)
+        return True
+    except Exception as exc:  # noqa: BLE001 — non-fatal by contract
+        logger.warning("history record_turn failed (non-fatal): %s", exc)
+        return False
+
+
 def extract_memory(memory_mgr: Any, user_message: str, response_content: str) -> bool:
     """
     Best-effort memory auto-extraction — the SYNC core shared by both

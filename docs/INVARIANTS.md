@@ -421,6 +421,20 @@ This file is the durable contract; per-release history lives in
   editable set or switch away from in-place mutation without revisiting the
   persistence/runtime/CLI interactions.
 
+## Conversation history (M29.1)
+
+- **Ids are validated before any path is built.** `ConversationStore._path`
+  rejects anything outside `^[A-Za-z0-9_-]+$` — every public method funnels
+  through it. Never construct a history path from raw input elsewhere.
+- **History must never fail a turn.** `record_turn` (like `extract_memory`)
+  swallows everything; `/chat` degrades to an unpersisted conversation when
+  the store errors. Keep it best-effort.
+- **Chat content stays private.** `profiles/*/history/` is gitignored and
+  excluded from portable bundles (by the M28 allowlist — do not add it);
+  full backups include it deliberately.
+- **The store is lock-guarded and per-profile** — `POST /profiles/activate`
+  re-points `main._history` (test-pinned in `test_history.py`).
+
 ## Memory (M4)
 
 - `PENDING_LIST_KEY = "pending"` in `memory/manager.py` — not `"pending_review"`.

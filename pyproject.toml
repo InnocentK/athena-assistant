@@ -44,6 +44,7 @@ packages = [
     "dav_status",
     "diagnostics",
     "files",
+    "history",
     "memory",
     "nextcloud_integration",
     "providers",

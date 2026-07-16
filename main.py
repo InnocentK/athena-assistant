@@ -45,6 +45,7 @@ from core.logger import logger
 from core.urlguard import DAVSecurityError
 from core.version import __version__
 from files.manager import FileManager
+from history.manager import ConversationStore
 from memory.manager import MemoryManager
 from saved.manager import SavedItemsManager
 from providers.router import ProviderRouter
@@ -61,6 +62,7 @@ _carddav: CardDAVClient | None = None
 _nextcloud: NextcloudClient | None = None
 _backup: BackupManager | None = None
 _saved: SavedItemsManager | None = None
+_history: "ConversationStore | None" = None  # M29.1 — persisted conversations
 
 # Restore diff tokens: token -> (zip_filename, expiry timestamp via time.monotonic()).
 # M26.7: the token is bound to the filename its diff was issued for, so a token
@@ -92,7 +94,7 @@ _DAV_WRITE_TIMEOUT = 30       # seconds — CalDAV/CardDAV writes (create/merge/
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # type: ignore[type-arg]
     """Load configuration, profile, provider router, memory manager, file manager, and CalDAV client on startup."""
-    global _router, _memory, _files, _caldav, _carddav, _nextcloud, _backup, _saved
+    global _router, _memory, _files, _caldav, _carddav, _nextcloud, _backup, _saved, _history
 
     settings = get_settings()
 
@@ -136,6 +138,14 @@ async def lifespan(app: FastAPI):  # type: ignore[type-arg]
     except Exception as exc:  # noqa: BLE001
         logger.error("SavedItemsManager failed to initialise: %s — /saved endpoints will be unavailable.", exc)
         _saved = None
+
+    # Initialise the conversation store (M29.1)
+    try:
+        _history = ConversationStore(active_profile_dir())
+        logger.info("ConversationStore initialised successfully.")
+    except Exception as exc:  # noqa: BLE001
+        logger.error("ConversationStore failed to initialise: %s — history will be unavailable.", exc)
+        _history = None
 
     # Initialise the file manager
     try:
@@ -734,7 +744,8 @@ import importlib as _importlib  # noqa: E402
 
 for _rname in (
     "core", "memory", "saved", "voice", "files",
-    "caldav", "carddav", "nextcloud", "backup", "portable", "dav_status",
+    "caldav", "carddav", "nextcloud", "backup", "portable", "history",
+    "dav_status",
 ):
     _rmod = _importlib.import_module(f"app.routers.{_rname}")
     _rmod = _importlib.reload(_rmod)
