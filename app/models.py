@@ -148,6 +148,12 @@ class BackupRestoreRequest(BaseModel):
     diff_token: Optional[str] = None  # token obtained from GET /backup/exports/{filename}/diff
 
 
+class PortableExportRequest(BaseModel):
+    """Create a portable identity bundle from the active profile (M28.0)."""
+
+    exclude_ids: list[str] = []   # memory entry ids to leave out (review step)
+
+
 class ProfileUpdate(BaseModel):
     """
     Partial update of the editable profile settings (M26).

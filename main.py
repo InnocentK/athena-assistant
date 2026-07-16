@@ -734,7 +734,7 @@ import importlib as _importlib  # noqa: E402
 
 for _rname in (
     "core", "memory", "saved", "voice", "files",
-    "caldav", "carddav", "nextcloud", "backup", "dav_status",
+    "caldav", "carddav", "nextcloud", "backup", "portable", "dav_status",
 ):
     _rmod = _importlib.import_module(f"app.routers.{_rname}")
     _rmod = _importlib.reload(_rmod)

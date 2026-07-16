@@ -4,6 +4,35 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [2.8.0] — Milestone 28.0 — Portable Profiles: export
+
+First half of the **M28 Portable Profiles epic** — **app bumped to 2.8.0**.
+Spec: `docs/specs/M28-portable-profiles.md`. Docs: `docs/PORTABLE-PROFILES.md`.
+
+### Added
+- **`backup/portable.py`** (`PortableProfileManager`): builds a host-agnostic,
+  secret-free identity **snapshot** (system prompt + memory + portable prefs)
+  as `data/exports/<stamp>_athena_portable.zip`. **Allowlist-built**
+  (`_sanitize_profile` constructs from a KEEP set — a future profile field
+  fails closed) and **leak-guarded**: live `.env` values or credential-shaped
+  strings anywhere, and URLs/host-paths in profile fields, are a **hard
+  failure** (never emitted). URLs in *memory* are user content → warnings for
+  review. Strips `memory.path`, `machine_overrides`, all of `config/`;
+  excludes pending-review + archive; the manifest carries **no hostname** and
+  states the snapshot-forks-on-import limitation.
+- **Routes** (`app/routers/portable.py`): `GET /portable/preview` (the review
+  step — sanitized fields + every memory entry id/category/key),
+  `POST /portable/exports` (with `exclude_ids` for per-entry exclusion; 409 on
+  a leak-guard hit), plus list/download/delete. Ops-audited via
+  `write_ops_event("portable_export")`.
+
+### Notes
+- Import is **M28.1** (next). Tests: `tests/test_portable.py` — identity kept
+  vs host fields stripped, pending-review/config/.env never travel, preview +
+  exclusion honored, **planted `.env` value / `sk-…` string / profile URL all
+  hard-fail with nothing emitted**, memory URL is warning-only, and portable/
+  backup listings stay disjoint. Gate: ruff + mypy + 470 pytest + 21 vitest.
+
 ## [2.7.1] — Milestone 27.1 — Token / context usage surfaces
 
 Second half of the **M27 epic** — **app bumped to 2.7.1**. Spec:

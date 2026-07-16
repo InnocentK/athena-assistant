@@ -20,6 +20,7 @@ Which doc do you want?
 | [HANDOFF.md](HANDOFF.md) | Orient as a new operator (a reading order) |
 | [RUNBOOK.md](RUNBOOK.md) | Perform day-to-day operational tasks |
 | [BACKUP.md](BACKUP.md) | Back up and restore |
+| [PORTABLE-PROFILES.md](PORTABLE-PROFILES.md) | Carry Athena's identity (prompt+memory) to another instance |
 | [SECURITY.md](SECURITY.md) | Understand what Athena protects and how |
 | [TASKFILE.md](TASKFILE.md) | Use the `task` command wrappers |
 

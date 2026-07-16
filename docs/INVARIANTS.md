@@ -406,6 +406,25 @@ This file is the durable contract; per-release history lives in
 - `PENDING_LIST_KEY = "pending"` in `memory/manager.py` — not `"pending_review"`.
 - **`auto_extract` writes only to the pending queue** — it never auto-approves.
 
+## Portable Profiles (M28)
+
+- **Export is allowlist-built.** `backup/portable.py::_sanitize_profile`
+  constructs the bundle from an explicit KEEP set — never filter fields off a
+  full copy. A new profile.yaml field must NOT travel until consciously added
+  to the allowlist (fail closed).
+- **A leak-guard hit is a hard failure.** Live `.env` values or
+  credential-shaped strings anywhere in the bundle, and URLs/absolute host
+  paths in profile fields, raise `PortableExportError` → HTTP 409 and **no zip
+  is written**. Never downgrade these to warnings. (URLs in *memory* entries
+  are the one warning-only case — user content, surfaced for review.)
+- **No machine identifiers.** The portable manifest has no `hostname` (unlike
+  the backup manifest); pending-review, archive, `config/`, and `.env` never
+  travel.
+- **Snapshot semantics.** Every surface (manifest, API response, docs) states
+  that the bundle forks on import — do not add sync/merge behaviour casually.
+- Tests: `tests/test_portable.py` (the planted-secret hard-fail tests are the
+  contract).
+
 ## Audit & packaging
 
 - **Audit logs** — four JSON-lines logs under `audit/`: `file_audit`,
