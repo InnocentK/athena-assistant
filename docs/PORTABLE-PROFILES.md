@@ -69,8 +69,27 @@ memory/<category>.yaml          saved memory categories
 
 ## Import
 
-Importing a bundle on another instance is **M28.1** (see
-`docs/specs/M28-portable-profiles.md`). The import side re-enforces the same
-allowlist (a hand-edited bundle with planted secrets is rejected), never
-clobbers an existing profile or `.env`, warns when a provider preference names
-a CLI the new host doesn't have, and repeats the fork warning.
+On the receiving instance, place the bundle zip in `data/exports/` and:
+
+```bash
+curl -s -X POST localhost:8000/portable/import \
+  -H 'Content-Type: application/json' \
+  -d '{"zip_filename": "<stamp>_athena_portable.zip", "new_name": "athena-two"}' \
+  | python3 -m json.tool
+```
+
+What import guarantees:
+
+- **The allowlist and leak scan run again on the way in** (defense in depth):
+  a hand-edited bundle with planted secrets or host data is rejected with 409
+  and nothing is written; stray `machine_overrides`/`memory.path` are stripped.
+- **Never overwrites.** If the target profile already exists you get a 409 —
+  pass `new_name` to import alongside it. `.env`, `config/`, and `data/` are
+  never touched.
+- **Provider preferences degrade gracefully.** Names the new host can't
+  resolve are kept (Athena's router skips unavailable providers at runtime)
+  and reported as a warning — install/log in to the vendor CLIs or set API
+  keys to activate them.
+- **The fork warning is repeated**: from this moment the two instances' memory
+  diverges. To *use* the imported identity, point `ACTIVE_PROFILE` at the new
+  profile directory name and restart.

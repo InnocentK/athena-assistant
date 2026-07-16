@@ -154,6 +154,13 @@ class PortableExportRequest(BaseModel):
     exclude_ids: list[str] = []   # memory entry ids to leave out (review step)
 
 
+class PortableImportRequest(BaseModel):
+    """Import a portable bundle as a NEW profile (M28.1) — never overwrites."""
+
+    zip_filename: str             # filename only, resolved against data/exports/
+    new_name: Optional[str] = None  # import under this name if the bundle's exists
+
+
 class ProfileUpdate(BaseModel):
     """
     Partial update of the editable profile settings (M26).

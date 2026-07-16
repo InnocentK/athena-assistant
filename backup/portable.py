@@ -72,6 +72,16 @@ class PortableExportError(Exception):
     """A striplist/leak-guard violation — the bundle must not be emitted."""
 
 
+class PortableImportError(Exception):
+    """An invalid/unsafe bundle or a clobber attempt — nothing is written."""
+
+
+def _slugify(name: str) -> str:
+    """Directory-safe profile slug: lowercase alnum plus - and _ (no paths)."""
+    cleaned = re.sub(r"[^a-z0-9_-]+", "-", name.strip().lower()).strip("-_")
+    return cleaned or "imported"
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -325,6 +335,121 @@ class PortableProfileManager:
             return manifest
         except Exception as exc:  # noqa: BLE001
             return {"valid": False, "error": str(exc)}
+
+    # ------------------------------------------------------------------
+    # Public API — M28.1 import
+    # ------------------------------------------------------------------
+
+    def import_bundle(
+        self, zip_path: Path, new_name: str | None = None
+    ) -> dict[str, Any]:
+        """
+        Materialize a NEW profile from a portable bundle. Defense in depth: the
+        incoming content is re-run through the same allowlist + leak scan as
+        export — a hand-edited bundle with planted secrets or host data is
+        rejected (PortableImportError), whoever claims to have made it.
+
+        Never clobbers: if the target profile directory exists, this raises —
+        pass ``new_name`` to import under a different name. Never touches
+        ``.env``, ``config/``, or ``data/``. Reads only fixed member names from
+        the zip (no member-derived write paths → no Zip-Slip surface).
+        """
+        manifest = self.inspect(zip_path)
+        if not manifest.get("valid"):
+            raise PortableImportError(
+                f"Not a readable portable bundle: {manifest.get('error', 'unknown')}"
+            )
+        if manifest.get("type") != PORTABLE_TYPE:
+            raise PortableImportError(
+                "Not a portable-profile bundle (wrong or missing type marker)."
+            )
+        warnings: list[str] = []
+        if str(manifest.get("portable_version")) != PORTABLE_VERSION:
+            warnings.append(
+                f"Bundle portable_version={manifest.get('portable_version')!r} differs "
+                f"from this app's {PORTABLE_VERSION!r} — importing best-effort."
+            )
+
+        # ---- read fixed members, re-sanitize (allowlist enforced on import too)
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            names = set(zf.namelist())
+            if "profile.yaml" not in names:
+                raise PortableImportError("Bundle has no profile.yaml.")
+            raw_profile = yaml.safe_load(zf.read("profile.yaml")) or {}
+            if not isinstance(raw_profile, dict):
+                raise PortableImportError("Bundle profile.yaml is not a mapping.")
+            portable = self._sanitize_profile(raw_profile)
+            by_cat: dict[str, list[dict[str, Any]]] = {}
+            for cat in CATEGORIES:
+                member = f"memory/{cat}.yaml"
+                entries: list[dict[str, Any]] = []
+                if member in names:
+                    data = yaml.safe_load(zf.read(member)) or {}
+                    raw = data.get(cat, [])
+                    if isinstance(raw, list):
+                        entries = [e for e in raw if isinstance(e, dict)]
+                by_cat[cat] = entries
+
+        # ---- leak scan the incoming content (same hard-fail contract)
+        profile_text = yaml.safe_dump(portable, sort_keys=False)
+        memory_text = "\n".join(
+            yaml.safe_dump({cat: items}, sort_keys=False) for cat, items in by_cat.items()
+        )
+        try:
+            warnings += self._leak_scan(profile_text, memory_text)
+        except PortableExportError as exc:
+            raise PortableImportError(f"Rejected bundle: {exc}") from None
+
+        # ---- provider degradation: warn on names this host can't resolve
+        try:
+            from providers.router import _ADAPTER_REGISTRY  # noqa: PLC0415
+
+            known = set(_ADAPTER_REGISTRY)
+            routing = portable.get("routing", {})
+            named = [routing.get("preferred_provider")] + list(
+                routing.get("fallback_order") or []
+            )
+            unknown = sorted({n for n in named if n and n not in known})
+            if unknown:
+                warnings.append(
+                    "Provider preference(s) not available on this host (kept; the "
+                    "router will skip them at runtime): " + ", ".join(unknown)
+                )
+        except Exception:  # noqa: BLE001 — a registry hiccup must not block import
+            pass
+
+        # ---- no-clobber target
+        slug = _slugify(new_name or str(portable.get("name", "imported")))
+        target_dir = self._root / "profiles" / slug
+        if target_dir.exists():
+            raise PortableImportError(
+                f"Profile '{slug}' already exists — pass a new_name to import "
+                "alongside it (import never overwrites)."
+            )
+
+        # ---- write the new profile
+        mem_dir = target_dir / "memory"
+        mem_dir.mkdir(parents=True)
+        (target_dir / "profile.yaml").write_text(profile_text, encoding="utf-8")
+        count = 0
+        for cat, items in by_cat.items():
+            (mem_dir / f"{cat}.yaml").write_text(
+                yaml.safe_dump({cat: items}, sort_keys=False), encoding="utf-8"
+            )
+            count += len(items)
+        (mem_dir / "pending_review.yaml").write_text(
+            yaml.safe_dump({"pending": []}), encoding="utf-8"
+        )
+
+        return {
+            "imported": True,
+            "profile_slug": slug,
+            "profile_name": portable.get("name"),
+            "profile_dir": str(target_dir.relative_to(self._root)),
+            "memory_entry_count": count,
+            "warnings": warnings,
+            "fork_warning": SNAPSHOT_NOTE,
+        }
 
     # ------------------------------------------------------------------
     # Internal

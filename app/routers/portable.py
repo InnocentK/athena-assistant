@@ -18,10 +18,14 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
-from backup.portable import PortableExportError, PortableProfileManager
+from backup.portable import (
+    PortableExportError,
+    PortableImportError,
+    PortableProfileManager,
+)
 from core.config import APP_ROOT, active_profile_dir
 
-from app.models import PortableExportRequest
+from app.models import PortableExportRequest, PortableImportRequest
 
 import main  # noqa: E402  — call-time-safe via reload in main.py; see docstring
 
@@ -101,6 +105,36 @@ async def portable_download(filename: str) -> FileResponse:
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.post("/portable/import", summary="Import a portable bundle as a new profile")
+async def portable_import(body: PortableImportRequest) -> dict[str, Any]:
+    """
+    Materialize a NEW profile from a bundle in data/exports/ (M28.1).
+
+    The allowlist + leak scan are re-enforced on the incoming content (409 on a
+    planted secret / wrong bundle type), and import **never overwrites** an
+    existing profile — pass ``new_name`` to import alongside one (409 otherwise).
+    The result repeats the snapshot/fork warning: the two identities now diverge.
+    """
+    pm = _manager()
+    zip_path = main._safe_export_path(body.zip_filename)
+    if not zip_path.exists():
+        raise HTTPException(status_code=404, detail=f"Bundle not found: {body.zip_filename}")
+    try:
+        result = await asyncio.to_thread(pm.import_bundle, zip_path, body.new_name)
+    except PortableImportError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    main.write_ops_event(
+        event="portable_import",
+        outcome="success",
+        detail={
+            "zip_filename": body.zip_filename,
+            "profile_slug": result["profile_slug"],
+            "memory_entry_count": result["memory_entry_count"],
+        },
+    )
+    return result
 
 
 @router.delete("/portable/exports/{filename}", summary="Delete a portable bundle")

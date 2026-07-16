@@ -422,8 +422,14 @@ This file is the durable contract; per-release history lives in
   travel.
 - **Snapshot semantics.** Every surface (manifest, API response, docs) states
   that the bundle forks on import — do not add sync/merge behaviour casually.
-- Tests: `tests/test_portable.py` (the planted-secret hard-fail tests are the
-  contract).
+- **Import re-enforces the allowlist and never clobbers (M28.1).** Incoming
+  bundles go through the same `_sanitize_profile` + leak scan (409 on planted
+  secrets; host fields stripped); an existing profile dir is never overwritten
+  (`new_name` required instead); `.env`/`config/`/`data/` are never touched;
+  only **fixed member names** are read from the zip — never derive a write path
+  from a zip member name.
+- Tests: `tests/test_portable.py` (the planted-secret hard-fail tests — export
+  AND import — are the contract).
 
 ## Audit & packaging
 

@@ -190,3 +190,114 @@ def test_portable_list_excludes_full_backups_and_vice_versa(client):
     assert ok.json()["filename"] in portable_names
     assert full.json()["filename"] in backup_names
     assert not portable_names & backup_names
+
+
+# ---------------------------------------------------------------------------
+# Import (M28.1)
+# ---------------------------------------------------------------------------
+
+
+def _write_bundle(client, *, profile: dict, memory: dict[str, list] | None = None,
+                  manifest_extra: dict | None = None, name="hand_bundle.zip") -> str:
+    """Hand-craft a portable bundle zip in data/exports/ (attacker-controlled)."""
+    manifest = {
+        "type": "athena-portable-profile",
+        "portable_version": "1",
+        "profile_name": profile.get("name", "X"),
+    }
+    manifest.update(manifest_extra or {})
+    path = _exports_dir(client) / name
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("athena_portable_manifest.json", json.dumps(manifest))
+        zf.writestr("profile.yaml", yaml.safe_dump(profile))
+        for cat, items in (memory or {}).items():
+            zf.writestr(f"memory/{cat}.yaml", yaml.safe_dump({cat: items}))
+    return name
+
+
+def test_import_round_trip_preserves_identity(client):
+    import core.config as cc
+
+    _seed_memory("facts", [{"id": "mem_rt1", "key": "likes", "value": "tea"}])
+    exported = _bundle(client).json()["filename"]
+
+    resp = client.post(
+        "/portable/import", json={"zip_filename": exported, "new_name": "athena-two"}
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["imported"] is True and data["profile_slug"] == "athena-two"
+    assert "fork" in data["fork_warning"].lower() or "snapshot" in data["fork_warning"].lower()
+
+    new_dir = cc.APP_ROOT / "profiles" / "athena-two"
+    prof = yaml.safe_load((new_dir / "profile.yaml").read_text())
+    assert prof["system_prompt"] == "You are a test assistant."
+    facts = yaml.safe_load((new_dir / "memory" / "facts.yaml").read_text())["facts"]
+    assert facts[0]["key"] == "likes"
+    pending = yaml.safe_load((new_dir / "memory" / "pending_review.yaml").read_text())
+    assert pending == {"pending": []}
+
+
+def test_import_never_clobbers_existing_profile(client):
+    exported = _bundle(client).json()["filename"]
+    # the bundle's own name slugifies to an existing profile dir? Use new_name
+    # pointing at the ACTIVE profile to attempt a clobber.
+    resp = client.post(
+        "/portable/import", json={"zip_filename": exported, "new_name": "athena"}
+    )
+    assert resp.status_code == 409
+    assert "never overwrites" in resp.json()["detail"]
+
+
+def test_import_rejects_wrong_bundle_type(client):
+    full = client.post("/backup/exports", json={}).json()["filename"]
+    resp = client.post("/portable/import", json={"zip_filename": full, "new_name": "x1"})
+    assert resp.status_code == 409
+
+
+def test_import_rejects_planted_secret_and_writes_nothing(client):
+    import core.config as cc
+
+    name = _write_bundle(
+        client,
+        profile={"name": "Evil", "system_prompt": "hi"},
+        memory={"facts": [{"id": "m1", "key": "k", "value": "sk-abcdefghijklmnop1234"}]},
+    )
+    resp = client.post("/portable/import", json={"zip_filename": name, "new_name": "evil"})
+    assert resp.status_code == 409
+    assert not (cc.APP_ROOT / "profiles" / "evil").exists()
+
+
+def test_import_re_sanitizes_host_fields(client):
+    import core.config as cc
+
+    name = _write_bundle(
+        client,
+        profile={
+            "name": "Sneaky",
+            "system_prompt": "hello",
+            "machine_overrides": {"box": {"x": 1}},
+            "memory": {"path": "../../outside", "auto_save_threshold": "low"},
+        },
+    )
+    resp = client.post("/portable/import", json={"zip_filename": name, "new_name": "sneaky"})
+    assert resp.status_code == 200
+    prof = yaml.safe_load(
+        (cc.APP_ROOT / "profiles" / "sneaky" / "profile.yaml").read_text()
+    )
+    assert prof["machine_overrides"] == {}
+    assert "path" not in prof["memory"]
+
+
+def test_import_warns_on_unknown_provider_but_succeeds(client):
+    name = _write_bundle(
+        client,
+        profile={
+            "name": "Wanderer",
+            "system_prompt": "hi",
+            "routing": {"mode": "balanced", "fallback_order": ["claude", "not-a-provider"]},
+        },
+    )
+    resp = client.post("/portable/import", json={"zip_filename": name, "new_name": "wanderer"})
+    assert resp.status_code == 200
+    assert any("not-a-provider" in w for w in resp.json()["warnings"])

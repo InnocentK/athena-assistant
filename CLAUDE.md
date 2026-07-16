@@ -168,13 +168,14 @@ frontend test harness). Full per-milestone detail is in `CHANGELOG.md`.
   *Deferred follow-up:* Claude-CLI usage via `--output-format json` (changes the
   primary provider's output path; can't be validated from the mocked suite — CLI
   transports report "unavailable" for now). → `docs/specs/M27-live-status-and-usage.md`
-- **M28 — Portable Profiles (epic).** Snapshot (not sync) identity bundles.
-  **M28.0 *shipped* → 2.8.0**: allowlist-built, leak-guarded export
-  (`backup/portable.py` + `app/routers/portable.py`; preview/review step with
-  per-entry `exclude_ids`; a striplist hit is a hard 409). **M28.1** (next)
-  import: re-enforce the allowlist, no-clobber, provider degradation warnings,
-  fork warning → 2.8.1. → `docs/specs/M28-portable-profiles.md` +
-  `docs/PORTABLE-PROFILES.md`
+- **M28 — Portable Profiles (epic) — *shipped*.** Snapshot (not sync) identity
+  bundles (`backup/portable.py` + `app/routers/portable.py`). **M28.0 → 2.8.0**:
+  allowlist-built, leak-guarded export with a preview/review step (per-entry
+  `exclude_ids`; a striplist hit is a hard 409). **M28.1 → 2.8.1**: import that
+  re-enforces the same allowlist + leak scan on incoming bundles, never
+  clobbers an existing profile / `.env` / `config/`, warns on unresolvable
+  provider names, and repeats the fork warning.
+  → `docs/specs/M28-portable-profiles.md` + `docs/PORTABLE-PROFILES.md`
 
 Historical specs for shipped milestones are archived in `docs/specs/` (they
 record the scope + measured counts + self-review for M26.19–M26.22).

@@ -4,6 +4,35 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [2.8.1] — Milestone 28.1 — Portable Profiles: import
+
+Second half of the **M28 epic** — **app bumped to 2.8.1**. Spec:
+`docs/specs/M28-portable-profiles.md`. Docs: `docs/PORTABLE-PROFILES.md`.
+
+### Added
+- **`PortableProfileManager.import_bundle`** + **`POST /portable/import`**:
+  materialize a **new** profile from a bundle in `data/exports/`. Defense in
+  depth — the incoming content is re-run through the **same allowlist**
+  (`_sanitize_profile`: a hand-edited bundle's `machine_overrides`/`memory.path`
+  are stripped on the way in) and the **same leak scan** (a planted secret /
+  credential-shaped string / profile URL → 409, nothing written). Wrong or
+  missing bundle type marker → 409.
+- **No-clobber**: importing never overwrites an existing profile (409 — pass
+  `new_name` to import alongside), and never touches `.env`, `config/`, or
+  `data/`. Only fixed member names are read from the zip (no member-derived
+  write paths → no Zip-Slip surface).
+- **Graceful provider degradation**: provider names the new host can't resolve
+  are kept (the router already skips unavailable providers at runtime) and
+  surfaced as a warning. The result repeats the **fork warning** — the two
+  identities diverge from this point.
+
+### Notes
+- Tests (now 14 in `tests/test_portable.py`): round-trip preserves identity +
+  empty pending queue, clobber attempt 409s, a full-backup zip is rejected as
+  wrong type, **planted secret in a hand-crafted bundle → 409 with no profile
+  dir created**, host fields re-sanitized on import, unknown provider warns but
+  imports. Gate: ruff + mypy + 476 pytest + 21 vitest.
+
 ## [2.8.0] — Milestone 28.0 — Portable Profiles: export
 
 First half of the **M28 Portable Profiles epic** — **app bumped to 2.8.0**.
