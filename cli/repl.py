@@ -139,6 +139,10 @@ def run_repl(router: Any, profile_config: dict[str, Any], args: Any) -> int:
             continue
 
         messages = build_turn_messages(history, text)
+        # REVIEW-3.0 F2: the user's question enters context NOW (web parity) —
+        # even if this turn fails, the question is kept; only the failure TEXT
+        # is never replayed (M26.10). Appended after build so it isn't doubled.
+        history.append(("user", text))
         if store is not None and conv_id:
             record_turn(store, conv_id, "user", text)
 
@@ -173,7 +177,6 @@ def run_repl(router: Any, profile_config: dict[str, Any], args: Any) -> int:
         # The answer — and only the answer — goes to stdout.
         print(response.content)
 
-        history.append(("user", text))
         history.append(("assistant", response.content))
 
         if not args.quiet:

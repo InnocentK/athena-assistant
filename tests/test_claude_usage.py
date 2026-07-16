@@ -195,3 +195,45 @@ def test_nonzero_exit_error_path_unchanged(monkeypatch):
 )
 def test_map_claude_usage_edges(raw, expected):
     assert _map_claude_usage(raw) == expected
+
+
+# ---------------------------------------------------------------------------
+# M29.8 — F4 (is_error before shape fallback) + F14 (empty output → failure)
+# ---------------------------------------------------------------------------
+
+
+def test_error_envelope_without_result_is_failure_not_raw_success(monkeypatch):
+    """F4: is_error is checked BEFORE the shape fallback — an error envelope
+    with a null/absent result must never render raw JSON as a success."""
+    env = {"type": "result", "is_error": True, "subtype": "error_max_turns", "result": None}
+    ok = SimpleNamespace(returncode=0, stdout=json.dumps(env), stderr="")
+    _, resp, _ = _complete(monkeypatch, HELP_WITH_FLAG, ok)
+    assert resp.success is False
+    assert "error_max_turns" in (resp.error or "")
+
+
+def test_error_envelope_without_result_or_subtype_generic_failure(monkeypatch):
+    env = {"type": "result", "is_error": True}
+    ok = SimpleNamespace(returncode=0, stdout=json.dumps(env), stderr="")
+    _, resp, _ = _complete(monkeypatch, HELP_WITH_FLAG, ok)
+    assert resp.success is False and "error result" in (resp.error or "")
+
+
+def test_empty_output_is_failure_plain_mode(monkeypatch):
+    """F14: empty answers fail (hermes parity) so the router falls through."""
+    ok = SimpleNamespace(returncode=0, stdout="   \n", stderr="")
+    _, resp, _ = _complete(monkeypatch, HELP_WITHOUT_FLAG, ok)
+    assert resp.success is False and "no output" in (resp.error or "")
+
+
+def test_empty_output_is_failure_json_mode(monkeypatch):
+    ok = SimpleNamespace(returncode=0, stdout="", stderr="")
+    _, resp, _ = _complete(monkeypatch, HELP_WITH_FLAG, ok)
+    assert resp.success is False and "no output" in (resp.error or "")
+
+
+def test_empty_result_string_in_envelope_is_failure(monkeypatch):
+    env = dict(ENVELOPE, result="   ")
+    ok = SimpleNamespace(returncode=0, stdout=json.dumps(env), stderr="")
+    _, resp, _ = _complete(monkeypatch, HELP_WITH_FLAG, ok)
+    assert resp.success is False and "no output" in (resp.error or "")

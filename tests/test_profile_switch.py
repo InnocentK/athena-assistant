@@ -109,3 +109,28 @@ def test_broken_switch_file_falls_through_to_env(client):
     cc.get_settings.cache_clear()
     # conftest sets ACTIVE_PROFILE=athena → boot survives, env used
     assert cc.get_settings().active_profile == "athena"
+
+
+def test_switch_never_empties_profile_and_preserves_identity(client):
+    """REVIEW-3.0 F5: update-then-prune — the shared dict keeps its object
+    identity (managers hold the reference), stale keys are pruned, and the
+    clear()+update() empty-window pattern is gone from the switch path."""
+    import inspect
+
+    import main as app_module
+
+    _mk_profile(client, "zeus", "Zeus")
+    before_id = id(app_module._profile_data)
+    app_module._profile_data["_sentinel_stale_key"] = True
+
+    resp = client.post("/profiles/activate", json={"name": "zeus"})
+    assert resp.status_code == 200
+    assert id(app_module._profile_data) == before_id          # same object
+    assert app_module._profile_data["name"] == "Zeus"          # new applied
+    assert "_sentinel_stale_key" not in app_module._profile_data  # pruned
+
+    # structural pin: the switch path must not use clear()
+    import app.routers.core as core_router
+
+    src = inspect.getsource(core_router.profiles_activate)
+    assert "_profile_data.clear()" not in src

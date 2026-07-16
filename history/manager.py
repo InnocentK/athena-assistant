@@ -29,6 +29,15 @@ _ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 _PREVIEW_LEN = 80
 
 
+def is_valid_conversation_id(conversation_id: str) -> bool:
+    """
+    THE conversation-id validator (REVIEW-3.0 F6) — the `/chat` handler and
+    the store both use this single pattern. Do not re-inline the regex at a
+    call site; drift between layers was the finding.
+    """
+    return bool(_ID_RE.match(conversation_id))
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 

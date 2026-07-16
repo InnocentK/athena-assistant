@@ -97,7 +97,9 @@ def test_repl_new_resets_history_and_conversation(repl_env, monkeypatch):
     assert sum(1 for _ in open(files[1])) == 2
 
 
-def test_repl_failure_not_replayed_but_persisted(repl_env, monkeypatch, capsys):
+def test_repl_failure_text_not_replayed_but_question_kept(repl_env, monkeypatch, capsys):
+    """REVIEW-3.0 F2 parity: the user's question stays in context on failure
+    (matching the web UI and /resume); only the failure TEXT never re-enters."""
     import json
 
     import core.config as cc
@@ -106,8 +108,11 @@ def test_repl_failure_not_replayed_but_persisted(repl_env, monkeypatch, capsys):
     router = _RecordingRouter(responses=[fail])
     code = _run(monkeypatch, router, ["bad turn", "good turn", "/exit"])
     assert code == 0
-    # second call must NOT contain the failed exchange
-    assert len(router.calls[1]) == 1
+    # second call carries the orphan user turn + the new user turn — and no
+    # assistant/failure text between them
+    assert [m.role for m in router.calls[1]] == ["user", "user"]
+    assert router.calls[1][0].content == "bad turn"
+    assert all("boom" not in m.content for m in router.calls[1])
     err = capsys.readouterr().err
     assert "Error: boom" in err
     # persisted with success:false meta

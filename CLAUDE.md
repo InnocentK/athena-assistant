@@ -255,13 +255,14 @@ still applies):**
   review of M28.2–M29.6 (report: `docs/history/REVIEW-3.0-2026-07.md`), docs
   drift fixed everywhere, coverage floor 70→74, review-cadence rule codified
   above. → `docs/specs/M29.7-pre-3.0-review.md`
-- **M29.8 — review remediation** (→ 2.9.8) — *proposed from the review,
-  APPROVED (post-errata)*: F1 upload race (`"xb"`), F2 REPL orphan-turn
-  alignment, F4 claude error-envelope ordering + F14 empty-output→failure
-  (hermes parity), F5 profile-switch update-then-prune, F6 shared
-  conversation-id validator, F7 portable/history negative test, F10 claude
-  docstring. ~45 lines total, each test-pinned.
-  **M30 (→ 3.0.0) starts only after this lands.**
+- **M29.8 — review remediation** (→ 2.9.8) — *shipped.* All eight
+  post-errata FIX findings implemented, each test-pinned (incl. a real
+  two-thread upload race test). → `docs/specs/M29.8-review-remediation.md`
+- **M29.9 — remediation diff-review** (no bump) — scoped review of the
+  M29.8 diff (per the cadence rule's spirit, user-directed) as an addendum
+  to REVIEW-3.0. **M30 (→ 3.0.0) starts only after this.** M30 itself embeds
+  a scoped review of its own diff before the final version-bump commit —
+  the pre-major review gate applied to code that IS the major.
 
 *M30 — Streaming (epic, → 3.0.0).* SSE per-provider streaming for API
 transports; streamed rendering in the web UI; streamed stdout in the CLI. CLI

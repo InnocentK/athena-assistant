@@ -4,6 +4,40 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [2.9.8] — Milestone 29.8 — Review remediation
+
+**App bumped to 2.9.8.** Spec: `docs/specs/M29.8-review-remediation.md` —
+implements the eight FIX-bucket findings of REVIEW-3.0 (post-errata queue),
+each test-pinned. ~45 lines of code.
+
+### Fixed
+- **F1** — uploads now create files with **exclusive `"xb"`** inside the
+  suffix loop: the filesystem enforces never-overwrite; a real two-thread
+  same-name race test pins it (both payloads intact, distinct names).
+- **F2** — the REPL keeps the user's question in context when a turn fails
+  (web/`/resume` parity); only the failure TEXT is never replayed (M26.10).
+- **F4** — claude envelope parse checks `is_error` **before** any shape
+  fallback: an error envelope with null/absent `result` is a failure (text
+  from `result`→`subtype`→generic), never raw-JSON-as-success.
+- **F14** — claude **empty output → provider failure** in both modes
+  ("Claude CLI returned no output.") — hermes parity; the router falls
+  through to a provider that answers.
+- **F5** — profile switch uses **update-then-prune** (never `clear()`+
+  `update()`): `_profile_data` is never empty mid-switch, object identity
+  preserved; structural + behavioral test pins.
+- **F6** — one conversation-id validator
+  (`history.manager.is_valid_conversation_id`) shared by `/chat` and the
+  store; layer-agreement test added.
+- **F7** — portable bundles: explicit negative test that `history/` (chat
+  content) never travels.
+- **F10** — claude.py module docstring refreshed (current CLI reference,
+  M29.5 + M29.8 behavior documented).
+
+### Notes
+- Gate: ruff + mypy + 544 pytest (@74 floor) + 22 vitest. Per the cadence
+  rule's spirit (user direction), M29.9 runs a scoped diff-review of this
+  milestone before M30 begins.
+
 ## [Unreleased] — Milestone 29.7 — Pre-3.0 review & docs sweep
 
 Docs/quality only — **no code change; the app stays at 2.9.6**. Spec:

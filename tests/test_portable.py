@@ -92,19 +92,27 @@ def test_export_keeps_identity_and_strips_host_fields(client):
     assert bundle["manifest"]["type"] == "athena-portable-profile"
 
 
-def test_pending_review_and_config_never_travel(client):
+def test_pending_review_config_and_history_never_travel(client):
     import core.config as cc
 
     pending = cc.APP_ROOT / "profiles" / "athena" / "memory" / "pending_review.yaml"
     pending.write_text(yaml.safe_dump({"pending": [{"id": "mem_p1", "key": "unreviewed"}]}))
+    # REVIEW-3.0 F7: chat content is the striplist's most sensitive class —
+    # pin that it never travels (true by allowlist construction; now asserted).
+    hist = cc.APP_ROOT / "profiles" / "athena" / "history"
+    hist.mkdir(parents=True, exist_ok=True)
+    (hist / "20260101T000000Z-aaaa.jsonl").write_text('{"role":"user","content":"secret chat"}\n')
 
     resp = _bundle(client)
     assert resp.status_code == 200
     with zipfile.ZipFile(_exports_dir(client) / resp.json()["filename"]) as zf:
         names = zf.namelist()
+        blob = b"".join(zf.read(n) for n in names)
     assert not any("pending_review" in n for n in names)
     assert not any(n.startswith("config/") for n in names)
     assert not any(".env" in n for n in names)
+    assert not any("history" in n for n in names)
+    assert b"secret chat" not in blob
 
 
 # ---------------------------------------------------------------------------

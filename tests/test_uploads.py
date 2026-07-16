@@ -60,3 +60,34 @@ def test_upload_rejects_oversize_and_leaves_nothing(client):
 def test_upload_rejects_empty(client):
     resp = client.post("/files/upload", files={"file": ("empty.txt", b"", "text/plain")})
     assert resp.status_code == 400
+
+
+def test_concurrent_same_name_uploads_never_overwrite(client):
+    """REVIEW-3.0 F1: exclusive create ('xb') means the filesystem enforces
+    never-overwrite — a real two-thread race must yield two distinct files
+    with both payloads intact."""
+    import threading
+
+    import core.config as cc
+
+    barrier = threading.Barrier(2, timeout=10)
+    results = []
+
+    def upload(payload: bytes):
+        barrier.wait()
+        r = client.post("/files/upload", files={"file": ("race.txt", payload, "text/plain")})
+        results.append(r.json())
+
+    t1 = threading.Thread(target=upload, args=(b"payload-A",))
+    t2 = threading.Thread(target=upload, args=(b"payload-B",))
+    t1.start()
+    t2.start()
+    t1.join(10)
+    t2.join(10)
+
+    names = {r["name"] for r in results}
+    assert len(names) == 2                              # distinct files
+    contents = {
+        (cc.APP_ROOT / "data" / "uploads" / n).read_bytes() for n in names
+    }
+    assert contents == {b"payload-A", b"payload-B"}     # both intact

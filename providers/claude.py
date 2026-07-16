@@ -1,9 +1,9 @@
 """
 providers/claude.py — Claude CLI adapter for Athena Assistant.
 
-Calls the Claude CLI (`claude -p "<prompt>"`) as a subprocess.
-The CLI must be installed and authenticated separately; see:
-  https://github.com/anthropics/claude-cli  (or equivalent)
+Calls the Claude CLI (Claude Code's `claude -p "<prompt>"`) as a subprocess.
+The CLI must be installed and authenticated separately (see Anthropic's
+Claude Code documentation).
 
 Availability: `shutil.which("claude")` must return a non-None path.
 Cost tier: high
@@ -12,9 +12,17 @@ M28.2 — token usage: when the installed CLI advertises `--output-format`
 (feature-detected via `claude --help`, cached), completions run with
 `--output-format json` and the result envelope is parsed **defensively**:
 content from the `"result"` key, usage counts mapped onto
-``metadata["usage"]`` like the API adapters. ANY deviation (no flag support,
-non-JSON stdout, missing keys) degrades to today's plain-text behavior —
-never break the primary provider for a metric.
+``metadata["usage"]`` like the API adapters. ANY shape deviation degrades to
+plain-text behavior — never break the primary provider for a metric.
+
+M29.5 — model attribution: the real envelope (validated against Claude Code
+2.1.206) carries no top-level ``model``; the name is recovered from the
+``modelUsage`` object's key, best-effort.
+
+M29.8 (REVIEW-3.0 F4/F14): ``is_error`` is evaluated BEFORE any shape
+fallback (an error envelope without a string ``result`` must never render as
+a successful answer), and empty output is a provider FAILURE in both modes
+(hermes parity — the router falls through to a provider that answers).
 """
 
 from __future__ import annotations
@@ -153,6 +161,15 @@ class ClaudeAdapter(ProviderAdapter):
             raw = result.stdout.strip()
             if json_mode:
                 return self._parse_json_envelope(raw)
+            if not raw:
+                # M29.8 (F14): empty output is a failure — hermes parity; the
+                # router falls through instead of surfacing a blank answer.
+                return ProviderResponse(
+                    success=False,
+                    content="",
+                    provider_name="claude",
+                    error="Claude CLI returned no output.",
+                )
             return ProviderResponse(
                 content=raw,
                 provider_name="claude",
@@ -169,41 +186,69 @@ class ClaudeAdapter(ProviderAdapter):
     @staticmethod
     def _parse_json_envelope(raw: str) -> ProviderResponse:
         """
-        Defensive parse of the `--output-format json` envelope (M28.2).
+        Defensive parse of the `--output-format json` envelope (M28.2, order
+        hardened M29.8/F4, empty-output failure M29.8/F14).
 
         Expected: {"type":"result","result":"...","usage":{...},"is_error":false}.
-        Every deviation degrades: non-JSON or no "result" key → raw stdout IS
-        the answer (success, no usage). "is_error": true → provider failure.
+        Order matters: `is_error` is checked BEFORE any shape fallback, so an
+        error envelope without a string `result` is still a failure — never
+        raw-JSON-as-success. Non-error shape deviations degrade: non-JSON or
+        no `result` key → raw stdout IS the answer. Empty content → failure.
         """
         try:
             data = json.loads(raw)
-        except Exception:  # noqa: BLE001 — CLI didn't honor JSON mode → plain answer
-            return ProviderResponse(content=raw, provider_name="claude", success=True)
-        if not isinstance(data, dict) or not isinstance(data.get("result"), str):
-            return ProviderResponse(content=raw, provider_name="claude", success=True)
+        except Exception:  # noqa: BLE001 — CLI didn't honor JSON mode → plain path
+            data = None
 
-        content = data["result"]
-        if data.get("is_error") is True:
+        if isinstance(data, dict):
+            # F4: error verdict first — independent of the result field's shape.
+            if data.get("is_error") is True:
+                err = data.get("result") if isinstance(data.get("result"), str) else None
+                err = (err or "").strip()
+                if not err:
+                    subtype = data.get("subtype")
+                    err = subtype if isinstance(subtype, str) and subtype else ""
+                return ProviderResponse(
+                    success=False,
+                    content="",
+                    provider_name="claude",
+                    error=err or "Claude CLI reported an error result.",
+                )
+            if isinstance(data.get("result"), str):
+                content = data["result"].strip()
+                if not content:
+                    # F14: an empty answer is useless — fail so the router
+                    # falls through (hermes parity).
+                    return ProviderResponse(
+                        success=False,
+                        content="",
+                        provider_name="claude",
+                        error="Claude CLI returned no output.",
+                    )
+                usage = _map_claude_usage(data.get("usage"))
+                model = data.get("model") if isinstance(data.get("model"), str) else None
+                if model is None:
+                    # M29.5: the real envelope (validated on 2.1.206) has no
+                    # top-level "model" — the name is modelUsage's key.
+                    model_usage = data.get("modelUsage")
+                    if isinstance(model_usage, dict) and model_usage:
+                        first = next(iter(model_usage))
+                        model = first if isinstance(first, str) else None
+                return ProviderResponse(
+                    content=content,
+                    provider_name="claude",
+                    model=model,
+                    success=True,
+                    metadata={"usage": usage} if usage else {},
+                )
+
+        # Non-JSON / shapeless non-error output: the raw text is the answer —
+        # unless it's empty (F14).
+        if not raw:
             return ProviderResponse(
                 success=False,
                 content="",
                 provider_name="claude",
-                error=content.strip() or "Claude CLI reported an error result.",
+                error="Claude CLI returned no output.",
             )
-        usage = _map_claude_usage(data.get("usage"))
-        model = data.get("model") if isinstance(data.get("model"), str) else None
-        if model is None:
-            # M29.5: the real CLI envelope (validated against 2.1.206) has no
-            # top-level "model" — the name is the key of the modelUsage object.
-            # Best-effort: non-empty dict with a string first key, else None.
-            model_usage = data.get("modelUsage")
-            if isinstance(model_usage, dict) and model_usage:
-                first = next(iter(model_usage))
-                model = first if isinstance(first, str) else None
-        return ProviderResponse(
-            content=content.strip(),
-            provider_name="claude",
-            model=model,
-            success=True,
-            metadata={"usage": usage} if usage else {},
-        )
+        return ProviderResponse(content=raw, provider_name="claude", success=True)

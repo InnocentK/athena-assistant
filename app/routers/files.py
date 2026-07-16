@@ -194,17 +194,27 @@ def _sanitize_upload_name(raw: str | None) -> str:
     return name or "upload"
 
 
-def _unique_path(name: str):
-    """data/uploads/<name>, suffixed -1, -2, ... on collision (never overwrite)."""
+def _open_unique_exclusive(name: str):
+    """
+    Create-and-open data/uploads/<name> (suffixed -1, -2, … on collision),
+    returning ``(file_handle, path)``.
+
+    REVIEW-3.0 F1: the file is opened with ``"xb"`` (exclusive create), so the
+    FILESYSTEM enforces never-overwrite — a concurrent same-name upload loses
+    the create race and simply retries the next suffix. Never replace this
+    with an exists()-check + ``"wb"`` (that was the race).
+    """
     base = _uploads_dir()
-    candidate = base / name
-    if not candidate.exists():
-        return candidate
     stem, dot, ext = name.partition(".")
-    for i in range(1, 1000):
-        candidate = base / (f"{stem}-{i}{dot}{ext}" if dot else f"{stem}-{i}")
-        if not candidate.exists():
-            return candidate
+    for i in range(1000):
+        if i == 0:
+            candidate = base / name
+        else:
+            candidate = base / (f"{stem}-{i}{dot}{ext}" if dot else f"{stem}-{i}")
+        try:
+            return open(candidate, "xb"), candidate
+        except FileExistsError:
+            continue
     raise HTTPException(status_code=409, detail="Too many files with this name.")
 
 
@@ -222,10 +232,10 @@ async def files_upload(file: UploadFile) -> dict[str, Any]:
 
     def _save() -> dict[str, Any]:
         _uploads_dir().mkdir(parents=True, exist_ok=True)
-        target = _unique_path(name)
+        fh, target = _open_unique_exclusive(name)
         written = 0
         try:
-            with open(target, "wb") as fh:
+            with fh:
                 while True:
                     chunk = file.file.read(64 * 1024)
                     if not chunk:

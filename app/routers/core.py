@@ -130,8 +130,13 @@ async def profiles_activate(body: ProfileActivateRequest) -> dict[str, Any]:
             sort_keys=False,
         )
         get_settings.cache_clear()
-        main._profile_data.clear()
+        # REVIEW-3.0 F5: update-then-prune, never clear()+update() — /chat
+        # readers in other worker threads share this dict and must never
+        # observe it empty. Every intermediate state is a mix of two VALID
+        # profiles; the object identity is preserved (managers hold the ref).
         main._profile_data.update(data)
+        for stale_key in [k for k in main._profile_data if k not in data]:
+            del main._profile_data[stale_key]
         main._memory = MemoryManager(active_profile_dir(), main._profile_data)
         main._saved = SavedItemsManager(active_profile_dir())
         # M29.1: conversations are per-profile too.
@@ -274,7 +279,10 @@ async def chat(request: ChatRequest) -> ChatResponse:
     # user turn before routing. All best-effort — history must never block or
     # fail a chat.
     conv_id: str | None = request.conversation_id
-    if conv_id is not None and not re.match(r"^[A-Za-z0-9_-]+$", conv_id):
+    # REVIEW-3.0 F6: one validator, shared with the store — never re-inline.
+    from history.manager import is_valid_conversation_id  # noqa: PLC0415
+
+    if conv_id is not None and not is_valid_conversation_id(conv_id):
         raise HTTPException(status_code=400, detail="Invalid conversation_id.")
     if main._history is not None:
         try:

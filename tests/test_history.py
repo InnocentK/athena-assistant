@@ -176,3 +176,20 @@ def test_profile_switch_repoints_history(client):
     import core.config as cc
 
     assert (cc.APP_ROOT / "profiles" / "zeus" / "history" / f"{conv}.jsonl").exists()
+
+
+def test_conversation_id_validator_agrees_at_both_layers(client):
+    """REVIEW-3.0 F6: one validator — /chat's 400 set and the store's
+    ValueError set are the same by construction; pin the agreement."""
+    import main as app_module
+    from history.manager import is_valid_conversation_id
+
+    app_module._router = _mock_router()
+    for bad in ("../x", "a/b", "a b", "", "x!y"):
+        assert not is_valid_conversation_id(bad)
+        if bad:  # empty string can't ride the JSON field meaningfully
+            resp = client.post(
+                "/chat", json={"message": "q", "history": [], "conversation_id": bad}
+            )
+            assert resp.status_code == 400, bad
+    assert is_valid_conversation_id("20260101T000000Z-abcd")

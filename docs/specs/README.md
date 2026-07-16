@@ -34,6 +34,7 @@ is the source of truth for what actually shipped.
 | [M29.5-claude-model-attribution.md](M29.5-claude-model-attribution.md) | Claude model attribution | 2.9.5 |
 | [M29.6-cli-history.md](M29.6-cli-history.md) | CLI history surfaces | 2.9.6 |
 | [M29.7-pre-3.0-review.md](M29.7-pre-3.0-review.md) | Pre-3.0 review & docs sweep | no bump |
+| [M29.8-review-remediation.md](M29.8-review-remediation.md) | Review remediation (8 findings) | 2.9.8 |
 
 ## Approved, pending implementation
 

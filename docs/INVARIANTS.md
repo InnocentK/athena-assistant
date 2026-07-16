@@ -290,7 +290,11 @@ This file is the durable contract; per-release history lives in
   envelope deviation (non-JSON stdout, missing `result`, probe failure) falls
   back to plain-text success, and `is_error: true` maps to a provider failure.
   Do not make JSON parsing strict — an envelope change in a future CLI must
-  degrade the metric, never the answer. Model attribution (M29.5) is the same
+  degrade the metric, never the answer. **Order is load-bearing (M29.8/F4):
+  `is_error` is evaluated BEFORE any shape fallback** — an error envelope
+  without a string `result` must never render as a successful answer. **Empty
+  output is a provider failure in both modes (M29.8/F14, hermes parity)** so
+  the router falls through. Model attribution (M29.5) is the same
   contract: top-level `model`, else `modelUsage`'s first key, else `None` —
   never a guess. The test fixture pins the REAL 2.1.206 envelope; when a new
   CLI version changes the shape, update the fixture from a live capture.
@@ -390,8 +394,11 @@ This file is the durable contract; per-release history lives in
   callback) is stderr-only and TTY-gated — do not route any of it to stdout.
   The M29.2 REPL keeps the same contract (the `you>` prompt itself is stderr),
   and its **entry is TTY-gated**: bare `athena` with a non-TTY stdin must stay
-  a usage error (exit 2) so scripts can never hang in an input loop. REPL
-  history replays a turn **only on success** (M26.10, CLI edition).
+  a usage error (exit 2) so scripts can never hang in an input loop.
+  **Failure-replay semantics (M29.8/F2, all surfaces):** the user's QUESTION
+  stays in context even when the turn fails; the failure TEXT is never
+  replayed (M26.10). Web, REPL, and restore/`/resume` all agree — keep them
+  agreeing.
 - **`route(on_attempt=…)` is measure-only (M27.0).** The progress callback fires
   before each available provider is called and is wrapped so any exception is
   swallowed — it must never influence routing, the attempt order, or the result
@@ -413,8 +420,12 @@ This file is the durable contract; per-release history lives in
   file must fall through to env, never brick boot). Do not reorder these.
 - **`POST /profiles/activate` validates `^[A-Za-z0-9_-]+$`** before touching
   the filesystem (traversal guard), never edits `.env`, and re-points
-  `_profile_data` (clear+update in place) + `main._memory` + `main._saved`.
+  `_profile_data` + `main._memory` + `main._saved` + `main._history`.
   In-flight requests finishing on the old managers is the intended semantics.
+  **The dict is updated via update-then-prune (M29.8/F5), never
+  `clear()+update()`** — `/chat` readers in other worker threads must never
+  observe an empty profile; object identity is preserved (managers hold the
+  reference). Test-pinned structurally.
 - **Env-mutating CLI flags need the conftest guard.** The CLI runs in-process
   in tests; `--profile`'s env write is cleared by an autouse fixture. A future
   flag that sets env must get the same treatment or it leaks across tests.
@@ -434,7 +445,9 @@ This file is the durable contract; per-release history lives in
 - **The upload endpoint fully controls the target path**: basename-only
   sanitization to `[A-Za-z0-9._-]` (no dotfiles, never empty) into
   `data/uploads/` only, unique-suffix on collision — never trust the client
-  filename, never overwrite.
+  filename, never overwrite. **Never-overwrite is enforced by exclusive
+  create (`open(…, "xb")` retried through the suffix loop, M29.8/F1)** — do
+  not regress to an exists()-check + `"wb"` (that was the race).
 - **The 10 MB cap is enforced during the streamed write** (partial file
   removed on breach) — do not switch to read-then-check.
 - **Reads stay allowlist-governed.** Uploads add no read path; do not
@@ -445,6 +458,8 @@ This file is the durable contract; per-release history lives in
 - **Ids are validated before any path is built.** `ConversationStore._path`
   rejects anything outside `^[A-Za-z0-9_-]+$` — every public method funnels
   through it. Never construct a history path from raw input elsewhere.
+  **`is_valid_conversation_id()` is THE validator (M29.8/F6)** — `/chat`
+  imports it; never re-inline the regex at a call site.
 - **History must never fail a turn.** `record_turn` (like `extract_memory`)
   swallows everything; `/chat` degrades to an unpersisted conversation when
   the store errors. Keep it best-effort.
