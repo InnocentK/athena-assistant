@@ -4,6 +4,48 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [Unreleased] — Milestone 29.7 — Pre-3.0 review & docs sweep
+
+Docs/quality only — **no code change; the app stays at 2.9.6**. Spec:
+`docs/specs/M29.7-pre-3.0-review.md`. Report:
+`docs/history/REVIEW-3.0-2026-07.md`.
+
+### Review (six lenses over M28.2–M29.6 + spot-checks of M26.27–M28.1)
+- **15 findings, three buckets.** FIX → the proposed **M29.8 review-
+  remediation queue** (awaiting approval): F1 upload same-name overwrite
+  race, F2 orphan-user-turn inconsistency across surfaces (REPL to be
+  aligned), **F4 claude.py error-envelope ordering gap** (new: an `is_error`
+  envelope without a string `result` renders raw JSON as a successful
+  answer), **F5 profile-switch empty-window race** (new: `clear()`+`update()`
+  can expose an empty profile to a racing `/chat`), F6 duplicated
+  conversation-id regex (new), F7 missing portable/history negative test,
+  F10 claude docstring drift. DEFER → F3 same-second id ordering tie
+  (display-only; actionable Later/unscheduled entry added). BLESS → F8
+  cross-module test fakes (TESTING.md note), F11 REPL closure, F12 probe
+  cache, F13 store lock pattern, F14 empty-envelope handling.
+- Lens statements recorded for everything that came back clean (security
+  traversal/secret sweep, concurrency audit, cross-surface contracts, test
+  quality, ergonomics, pre-batch spot-checks).
+
+### Docs sweep (all drift found in the spec investigation, all fixed)
+- `docs/specs/README.md` rebuilt — 13 unlisted specs indexed, stale header
+  gone; `docs/ARCHITECTURE.md` tree now carries `core/chat_turn.py`,
+  `history/`, `cli/{repl,doctor,history_cmd}.py`, `backup/portable.py`, the
+  `portable`/`history` routers; `docs/CONFIGURATION.md` documents the M28.5
+  active-profile resolution order; root `README.md` CLI tour + layout brought
+  current; `docs/VALIDATION.md`/`docs/RUNBOOK.md` lead with `athena doctor`;
+  `docs/BACKUP.md` notes history rides in backups (portable bundles never);
+  `docs/TESTING.md` "not covered" list updated (REPL terminal, SW runtime) +
+  shared-fakes note; `docs/RUN_AND_VALIDATE.md` tombstone → `docs/history/`.
+- **Review-cadence rule codified in CLAUDE.md** (user-requested): full review
+  before any major; scoped review at each epic close; scoped review after any
+  autonomous batch ≥5 milestones; three-bucket disposal mandatory.
+
+### Quality
+- **Coverage floor raised 70 → 74** (`pyproject.toml`): measured source-only
+  coverage is 76.86% at 536 tests — same ~3-point headroom philosophy as the
+  original setting.
+
 ## [2.9.6] — Milestone 29.6 — CLI history surfaces
 
 **App bumped to 2.9.6.** Spec: `docs/specs/M29.6-cli-history.md`. Closes the

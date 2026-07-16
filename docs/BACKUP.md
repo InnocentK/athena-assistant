@@ -11,7 +11,11 @@ credentials separately).
 
 ## What's in a backup
 
-- `profiles/` (including per-profile memory) and `config/*.yaml` by default.
+- `profiles/` (including per-profile memory **and conversation history** —
+  `history/*.jsonl`, M29.1) and `config/*.yaml` by default. Backups are
+  same-host restore tooling, so chat content riding along is intentional;
+  portable profiles (PORTABLE-PROFILES.md) are the scrubbed alternative and
+  never include history.
 - Optionally `audit/` and `data/` (via `include_audit` / `include_data`).
 - A `athena_backup_manifest.json` recording the app version, timestamp, and file
   list.

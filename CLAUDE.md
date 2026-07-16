@@ -52,6 +52,28 @@ Every change ships as a narrow milestone following this exact loop:
 7. **Stop** — report files changed / test result / version; wait for the next
    approval.
 
+### Review cadence (M29.7 rule — reviews are scheduled, not optional)
+
+Fresh-eyes reviews happen on THREE triggers, whichever fires first — chosen to
+track *unreviewed change volume*, not version arithmetic:
+
+1. **Before any major version bump (X.0.0):** a FULL review is a mandatory
+   release gate — all six lenses (correctness, security, concurrency,
+   cross-surface consistency, test quality, agent ergonomics) over everything
+   unreviewed, plus a docs sweep and a coverage re-measure.
+2. **At each epic close** (end of a minor series, before the next epic
+   starts): a scoped review of that epic's code — correctness, security, and
+   cross-surface consistency at minimum.
+3. **After any autonomous batch of >=5 milestones** (overnight/pre-approved
+   runs): the batch's output gets the scoped review before new feature work.
+
+Every review: findings exit through exactly one of three buckets — **fix**
+(a scoped follow-up milestone), **defer** (an actionable entry with a trigger
+condition in Later/unscheduled below), or **bless** (an INVARIANTS/docs note
+that the behavior is intended). A lens that finds nothing states what it
+checked. Reports are archived in `docs/history/` (see REVIEW-2026-07 and
+REVIEW-3.0-2026-07 for the format).
+
 **Version:** bump `core/version.py` (`__version__`) — the ONLY bump site
 (M26.17). `main.py`, `pyproject.toml` (dynamic), and the health test all read
 it. Details in `docs/INVARIANTS.md`.
@@ -102,7 +124,7 @@ history/manager.py          per-profile JSONL conversation store (M29.1)
 core/version.py             __version__ — the single bump site
 core/urlguard.py            DAV same-origin guard (M26.13)
 providers/                  router.py + adapters (claude/gemini/chatgpt/grok/ollama/hermes/chatgpt_cli)
-cli/                        one-shot CLI (main.py, status.py) — python -m cli / athena
+cli/                        athena CLI: one-shot + REPL + history + doctor (M29.2/.6, M28.6)
 memory/ · saved/ · files/   YAML memory + saved items + allowlisted file access
 caldav_integration/ · carddav_integration/ · nextcloud_integration/   NETWORK clients
 dav_io/                     LOCAL ICS/VCF parse/format/conflicts (no network)
@@ -122,7 +144,9 @@ network integration. Each package's `__init__.py` says what it owns, what it
 does *not*, and where its tests live — read it first. Data/code look-alikes:
 `saved/` is code, `profiles/<name>/saved/` is that profile's data; `config/`
 is user-editable YAML, `core/config.py` is the loader. This map and the tree
-in `docs/ARCHITECTURE.md` mirror each other — update both together.
+in `docs/ARCHITECTURE.md` mirror each other — update both together, and
+record every shipped milestone in `docs/specs/README.md` (the M29.7 review
+found 13 unlisted specs — do not let that recur).
 
 ## Roadmap
 
@@ -226,9 +250,16 @@ still applies):**
   list/show/export (variadic + `--all`), REPL `/list` + `/resume`
   (success-only replay), shared `render_markdown` on the store. **The M29
   Conversations epic is complete.** → `docs/specs/M29.6-cli-history.md`
-- **M29.7 — pre-3.0 review & docs sweep** (no bump) — *next, awaiting
-  go-ahead*: fresh-eyes review of M28.2–M29.6, doc-drift fixes (spec index,
-  ARCHITECTURE tree), README/INSTALLATION refresh, coverage-floor decision.
+- **M29.7 — pre-3.0 review & docs sweep** (no bump) — *shipped.* Six-lens
+  review of M28.2–M29.6 (report: `docs/history/REVIEW-3.0-2026-07.md`), docs
+  drift fixed everywhere, coverage floor 70→74, review-cadence rule codified
+  above. → `docs/specs/M29.7-pre-3.0-review.md`
+- **M29.8 — review remediation** (→ 2.9.8) — *proposed from the review,
+  AWAITING USER APPROVAL*: F1 upload race (`"xb"`), F2 REPL orphan-turn
+  alignment, F4 claude error-envelope ordering, F5 profile-switch
+  update-then-prune, F6 shared conversation-id validator, F7 portable/history
+  negative test, F10 claude docstring. ~40 lines total, each test-pinned.
+  **M30 (→ 3.0.0) starts only after this lands.**
 
 *M30 — Streaming (epic, → 3.0.0).* SSE per-provider streaming for API
 transports; streamed rendering in the web UI; streamed stdout in the CLI. CLI
@@ -247,7 +278,11 @@ the UI gates them); update checker / `athena update` (blocked on the repo
 having a git remote); richer history export (zip bundles of many
 conversations, an export-all web endpoint, date-range selection — the
 deliberate scope cut from M29.6's stdout-only variadic CLI export; revisit
-only if plain-Markdown-to-stdout ever pinches).
+only if plain-Markdown-to-stdout ever pinches); deterministic conversation
+ordering (REVIEW-3.0 F3: two conversations created in the same second tie in
+newest-first listings and the random id suffix decides — display-only, no
+code path decides on ordering; fix would be sub-second id stamps or a
+last-activity sort; revisit if listing order ever visibly misleads).
 
 ## Suggested first actions
 

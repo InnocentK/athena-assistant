@@ -11,15 +11,22 @@ Browser (vanilla JS)                       athena / python -m cli
     ↕ HTTP (FastAPI / uvicorn)                 ↕ (no HTTP — same Python stack)
 main.py  ← app assembly + state layer      cli/main.py + cli/status.py
     │   (lifespan, _require_*, shared helpers, GET /; includes the routers)
+    │                                          cli/repl.py      interactive session (M29.2)
+    │                                          cli/doctor.py    preflight checks (M28.6)
+    │                                          cli/history_cmd.py  athena history … (M29.6)
     ├── app/models.py         Pydantic request/response models (M26.18)
     ├── app/routers/*.py      one APIRouter per domain: core, memory, saved,
     │                         voice, files, caldav, carddav, nextcloud, backup,
-    │                         dav_status — handlers reach state via `main.` (M26.18)
-    ├── core/config.py        APP_ROOT, Settings, load_yaml
+    │                         portable, history, dav_status — handlers reach
+    │                         state via `main.` (M26.18)
+    ├── core/config.py        APP_ROOT, Settings (active-profile resolution:
+    │                         override > switch file > env > default, M28.5)
     ├── core/loader.py        YAML read/write helpers
     ├── core/logger.py        Shared structured logger
     ├── core/version.py       __version__ — the single bump site (M26.17)
     ├── core/urlguard.py      DAV same-origin guard (M26.13)
+    ├── core/chat_turn.py     Shared turn assembly + memory/history cores —
+    │                         ONE pipeline for web + CLI (M29.0/29.1)
     │
     ├── providers/router.py   Route chat messages to AI providers (instrumented → diagnostics/, M22)
     │   ├── claude.py         Claude CLI adapter
@@ -31,11 +38,14 @@ main.py  ← app assembly + state layer      cli/main.py + cli/status.py
     │   └── chatgpt_cli.py    ChatGPT CLI stub (not a live adapter — see chatgpt.py)
     │
     ├── memory/manager.py     YAML flat-file memory (per profile) + pending review queue
+    ├── history/manager.py    Persistent conversations — append-only JSONL per
+    │                         conversation, per profile; shared Markdown renderer (M29.1/.6)
     ├── saved/manager.py      Saved searches (file) + saved actions (prompts), per profile
     ├── voice/stubs.py        STT/TTS stub + upgrade docs
-    ├── files/manager.py      Dynamic allowlist, search/read/write, audit
-    ├── diagnostics/store.py  Provider latency ring buffer (measure-only, M22)
+    ├── files/manager.py      Dynamic allowlist, search/read/write, audit (+ uploads → data/uploads/, M29.3)
+    ├── diagnostics/store.py  Provider latency + token-usage trace (measure-only, M22/M27.1)
     ├── backup/manager.py     Export zip+manifest, dry-run diff, staged restore
+    ├── backup/portable.py    Portable Profiles — allowlist-built, leak-guarded identity snapshots (M28)
     ├── audit/ops_audit.py    JSON-lines ops audit (destructive/operational events)
     │
     ├── caldav_integration/   CalDAV network client (read + task create)

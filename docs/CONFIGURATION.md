@@ -89,7 +89,25 @@ memory:
 applied to the running server without a restart; the next CLI run reloads the
 file. Everything else is edited in the file directly (restart to apply).
 
-Select a profile with `ACTIVE_PROFILE=<name>` or the CLI `--profile <name>`.
+### Selecting the active profile (M28.5 resolution order)
+
+The active profile resolves through four mechanisms — first match wins:
+
+1. **`ATHENA_PROFILE_OVERRIDE`** env — process-scoped explicit override; the
+   CLI's `--profile <name>` flag sets this, so the flag beats everything.
+2. **`config/active_profile.yaml`** — the runtime-switch file, written ONLY
+   by `POST /profiles/activate` (the Settings-panel "Active profile"
+   dropdown, or the endpoint directly). It deliberately beats the environment
+   so a UI switch survives restarts on default installs (where `.env` sets
+   `ACTIVE_PROFILE`). Delete the file — or switch back — to return control to
+   the environment. A broken file falls through harmlessly.
+3. **`ACTIVE_PROFILE`** env (usually via `.env`).
+4. The default, `athena`.
+
+Switching at runtime (`POST /profiles/activate {"name": "..."}`) re-points the
+live profile, memory, saved items, and conversation history without a restart;
+in-flight requests finish on the previous profile. `GET /profiles` lists the
+available profiles.
 
 ### App vs profile version
 

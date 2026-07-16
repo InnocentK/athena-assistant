@@ -4,6 +4,14 @@ Operational procedures for common tasks.
 
 ---
 
+## First diagnostic: `athena doctor`
+
+Before anything else when a host misbehaves: `athena doctor` (or
+`athena --doctor`). Config/filesystem checks only — no network — exit 1 iff
+something failed. It tells you which provider keys and vendor CLIs the host
+actually has, whether the active profile resolves and parses, and whether the
+runtime directories are writable.
+
 ## Start / Stop
 
 ### Local

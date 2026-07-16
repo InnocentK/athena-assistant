@@ -46,12 +46,21 @@ pip install -e .
 
 athena "What's the status of X?"
 athena ask "What's the status of X?"     # `ask` is an alias of the bare prompt
+athena                                   # no prompt on a terminal → interactive REPL
+athena history                           # list persisted conversations
+athena history export <id>               # conversation as Markdown on stdout (or --all)
+athena doctor                            # preflight checks: keys, CLIs, profile, dirs, disk
 athena --list-providers                  # provider availability + effective transport
 ```
 
+In the REPL: `/list`, `/resume <id>`, `/new`, `/exit`. Conversations persist
+across restarts (per profile, under `profiles/<name>/history/` — gitignored)
+and are shared with the web UI's History panel.
+
 Useful flags: `--profile`, `--mode`, `--provider`, `--no-memory`,
 `--diagnostics` (per-provider timing on stderr), `-q`/`--quiet`. Stdout is the
-answer only, so it pipes cleanly; status and diagnostics go to stderr.
+answer only, so it pipes cleanly; status, token usage, and diagnostics go to
+stderr.
 
 > If `athena` is "command not found" after install, its scripts directory
 > (e.g. `~/.local/bin`) may not be on your PATH — add it, or use
@@ -80,17 +89,17 @@ the running app version and active profile.
 ## Project layout
 
 ```
-main.py                  FastAPI app, all routes, lifespan init
-core/                    config, YAML loader, logger
+main.py + app/           FastAPI assembly, models, one router per domain
+core/                    config (profile resolution), YAML loader, logger, shared chat-turn pipeline
 providers/               ProviderRouter + adapters (claude, gemini, chatgpt, grok, ollama, hermes)
-cli/                     one-shot CLI (python -m cli / athena)
-memory/  saved/  files/  YAML memory, saved items, allowlisted file I/O
-diagnostics/             provider latency trace (measure-only)
+cli/                     athena CLI: one-shot, REPL, history, doctor
+memory/  history/  saved/  files/   YAML memory, persistent conversations (JSONL), saved items, allowlisted file I/O + uploads
+diagnostics/             provider latency + token-usage trace (measure-only)
 caldav_integration/  carddav_integration/  nextcloud_integration/  dav_io/  dav_status/
-backup/  audit/          export/restore, JSON-lines ops audit
+backup/  audit/          export/restore + portable profiles, JSON-lines ops audit
 config/  profiles/        YAML config and per-profile data
-templates/  static/       chat UI (Jinja2 + vanilla JS/CSS)
-tests/                   pytest suite
+templates/  static/       chat UI (Jinja2 + vanilla JS/CSS; installable PWA)
+tests/                   pytest + vitest suites
 ```
 
 ## Testing

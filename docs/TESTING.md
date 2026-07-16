@@ -113,6 +113,14 @@ Python-side source-structure guards (`test_chat_status_ui.py`,
 - Full end-to-end browser rendering/CSS (jsdom is not a full browser; M26.10 was
   smoke-verified with headless Chromium during implementation)
 - Docker build and container integration
+- The REPL's raw terminal behaviors (real TTY signals, readline editing) —
+  the scripted-stdin suite covers the loop logic, not the terminal itself
+- The PWA service worker's runtime caching (no service-worker runtime in
+  jsdom; the registration guard and the /sw.js route are covered)
+
+Shared test fakes note: `tests/test_history_cli.py` deliberately imports
+the router/stdin fakes from `tests/test_cli.py` / `tests/test_repl.py`
+(blessed in REVIEW-3.0 F8) — refactor those helpers with their importers.
 
 ## Running the tests
 

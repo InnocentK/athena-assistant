@@ -97,7 +97,7 @@ show_missing = true
 # silently erode. Headroom is intentional: the DAV/network clients are mocked but
 # not fully exercised (live servers needed), so their coverage swings a few points
 # with small test changes. Raise the floor as those gaps get real tests.
-fail_under = 70
+fail_under = 74  # ratcheted M29.7 (measured 76.86% at 536 tests; was 70 under 74%)
 exclude_lines = [
     "pragma: no cover",
     "if __name__ == .__main__.:",

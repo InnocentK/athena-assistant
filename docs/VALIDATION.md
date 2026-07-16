@@ -4,6 +4,11 @@ The fast way to confirm a running Athena instance is healthy. For setup see
 [INSTALLATION.md](INSTALLATION.md); for problems see
 [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
+**Step zero: `athena doctor`** (M28.6) — one command that checks versions,
+provider key names, vendor CLIs on PATH, active-profile resolution and
+validity, directory writability, disk, and DAV config, with a non-zero exit
+on any failure. Run it before the manual checks below.
+
 > The authoritative regression check is the automated test suite:
 > `task test:run` (or `python -m pytest tests/ -q`). The historical,
 > milestone-by-milestone validation recipes are archived under
