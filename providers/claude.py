@@ -34,6 +34,14 @@ from typing import Any
 
 from providers.base import Message, ProviderAdapter, ProviderResponse, neutral_cwd
 
+# M30.7: Athena chat turns are pure-LLM — deny the CLI's agent tools (in -p
+# mode it can otherwise read/search the filesystem and run tool loops).
+# Explicit names required (a "*" wildcard denies nothing — probed live);
+# unknown names only WARN (exit 0), so this list is safe across CLI versions.
+_DISALLOWED_TOOLS = (
+    "Task,Bash,Glob,Grep,Read,Edit,Write,NotebookEdit,WebFetch,WebSearch,TodoWrite"
+)
+
 
 def _build_prompt(messages: list[Message], system_prompt: str | None) -> str:
     """
@@ -84,9 +92,10 @@ class ClaudeAdapter(ProviderAdapter):
     """Adapter that drives the Claude CLI via subprocess."""
 
     def __init__(self) -> None:
-        # M28.2: feature-detection result, cached per adapter lifetime.
-        # None = not probed yet; True/False = probed.
-        self._json_supported: bool | None = None
+        # M28.2/M30.7: feature-detection, cached per adapter lifetime.
+        # _help_text: None = not probed yet; "" = probe failed; else the
+        # `claude --help` output both _supports_* checks read.
+        self._help_text: str | None = None
 
     def name(self) -> str:
         return "claude"
@@ -97,13 +106,14 @@ class ClaudeAdapter(ProviderAdapter):
     def is_available(self) -> bool:
         return shutil.which("claude") is not None
 
-    def _supports_json_output(self) -> bool:
+    def _cli_help(self) -> str:
         """
-        True iff `claude --help` mentions `--output-format` (M28.2). Probed
-        once and cached; ANY failure → False (plain invocation, today's path).
-        The probe is local and fast — same subprocess hardening as completions.
+        `claude --help` output, probed ONCE and cached (M28.2 pattern,
+        shared by every feature check since M30.7). ANY failure → "" (all
+        checks read False → plain invocation, the safest path). Same
+        subprocess hardening + neutral cwd as completions.
         """
-        if self._json_supported is None:
+        if self._help_text is None:
             try:
                 probe = subprocess.run(
                     ["claude", "--help"],
@@ -115,12 +125,18 @@ class ClaudeAdapter(ProviderAdapter):
                     cwd=neutral_cwd(),  # M30.3: never inherit a project directory
                     timeout=10,
                 )
-                self._json_supported = "--output-format" in (
-                    (probe.stdout or "") + (probe.stderr or "")
-                )
-            except Exception:  # noqa: BLE001 — no probe, no JSON mode
-                self._json_supported = False
-        return self._json_supported
+                self._help_text = (probe.stdout or "") + (probe.stderr or "")
+            except Exception:  # noqa: BLE001 — no probe, no feature flags
+                self._help_text = ""
+        return self._help_text
+
+    def _supports_json_output(self) -> bool:
+        """True iff the CLI advertises `--output-format` (M28.2)."""
+        return "--output-format" in self._cli_help()
+
+    def _supports_tool_restriction(self) -> bool:
+        """True iff the CLI advertises `--disallowedTools` (M30.7)."""
+        return "--disallowedTools" in self._cli_help()
 
     def complete(
         self,
@@ -132,6 +148,15 @@ class ClaudeAdapter(ProviderAdapter):
         args = ["claude", "-p", prompt]
         if json_mode:
             args += ["--output-format", "json"]
+        # M30.7: Athena chat turns are pure-LLM by policy — in `-p` mode the
+        # CLI is otherwise a full agent with read-only tools (observed live:
+        # it searched its neutral cwd and misdiagnosed the upload system,
+        # burning most of a 40–68s turn). Feature-detected like JSON mode;
+        # probed live: unknown tool names only WARN (exit 0), so a stale
+        # denylist can never break answers. Tool-calling as a real feature
+        # stays a Later item with its own safety framing.
+        if self._supports_tool_restriction():
+            args += ["--disallowedTools", _DISALLOWED_TOOLS]
 
         try:
             result = subprocess.run(

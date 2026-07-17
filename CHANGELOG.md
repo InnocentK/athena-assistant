@@ -4,6 +4,30 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [3.0.6] — Milestone 30.7 — Claude transport tool restriction
+
+**App bumped to 3.0.6.** Spec: `docs/specs/M30.7-claude-tool-restriction.md`.
+In `-p` mode the claude CLI is a full agent with read-only tools — observed
+live searching its (neutral, M30.3) cwd, burning most of a 40–68s turn, and
+misdiagnosing the upload system from temp-dir archaeology. Athena chat turns
+are pure-LLM by policy; tool-calling stays a Later feature with its own
+safety framing.
+
+### Changed
+- `complete()` passes `--disallowedTools` with an explicit denylist
+  (Task/Bash/Glob/Grep/Read/Edit/Write/NotebookEdit/WebFetch/WebSearch/
+  TodoWrite), **feature-detected** like JSON mode — the M28.2 help probe is
+  now cached once and feeds both checks; old CLIs without the flag keep
+  today's behavior. Probed live before implementing: a `"*"` wildcard denies
+  NOTHING; explicit names deny; unknown names only WARN (exit 0), so a stale
+  list can never break answers.
+
+### Notes
+- Faster, cheaper, predictable claude turns; persona/user-global config is
+  untouched (this restricts tools, not identity).
+- **The 2026-07-17 desktop-triage queue (M30.4–M30.7) is complete.**
+- Gate: ruff + mypy exit 0 + **615 pytest** + 34 vitest.
+
 ## [3.0.5] — Milestone 30.6 — Voice output/input controls
 
 **App bumped to 3.0.5.** Spec: `docs/specs/M30.6-voice-controls.md`. From the

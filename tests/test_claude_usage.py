@@ -237,3 +237,67 @@ def test_empty_result_string_in_envelope_is_failure(monkeypatch):
     ok = SimpleNamespace(returncode=0, stdout=json.dumps(env), stderr="")
     _, resp, _ = _complete(monkeypatch, HELP_WITH_FLAG, ok)
     assert resp.success is False and "no output" in (resp.error or "")
+
+
+# ---------------------------------------------------------------------------
+# M30.7 — tool restriction (feature-detected, like JSON mode)
+# ---------------------------------------------------------------------------
+
+
+def _fake_run_recorder(mocker, help_text: str):
+    """subprocess.run fake: --help returns help_text; completions echo args."""
+    calls: list[list] = []
+
+    def _run(args, **kwargs):
+        calls.append(list(args))
+        if "--help" in args:
+            return mocker.MagicMock(returncode=0, stdout=help_text, stderr="")
+        return mocker.MagicMock(returncode=0, stdout="fine answer", stderr="")
+
+    return calls, _run
+
+
+def test_tool_restriction_flag_added_when_supported(mocker):
+    from providers.claude import _DISALLOWED_TOOLS, ClaudeAdapter
+
+    calls, run = _fake_run_recorder(
+        mocker, "usage… --output-format … --disallowedTools …"
+    )
+    mocker.patch("providers.claude.subprocess.run", side_effect=run)
+
+    ClaudeAdapter().complete([Message(role="user", content="hi")], None)
+
+    completion = calls[-1]
+    idx = completion.index("--disallowedTools")
+    assert completion[idx + 1] == _DISALLOWED_TOOLS
+    # pure-LLM denylist covers the agent's action tools
+    for name in ("Bash", "Read", "Glob", "WebSearch", "Write", "Task"):
+        assert name in _DISALLOWED_TOOLS
+
+
+def test_tool_restriction_omitted_on_old_cli(mocker):
+    from providers.claude import ClaudeAdapter
+
+    calls, run = _fake_run_recorder(mocker, "usage… --output-format …")  # no flag
+    mocker.patch("providers.claude.subprocess.run", side_effect=run)
+
+    ClaudeAdapter().complete([Message(role="user", content="hi")], None)
+
+    assert "--disallowedTools" not in calls[-1]  # degrade: agentic as before
+    assert "--output-format" in calls[-1]        # JSON mode unaffected
+
+
+def test_help_probe_runs_once_for_both_feature_checks(mocker):
+    from providers.claude import ClaudeAdapter
+
+    calls, run = _fake_run_recorder(
+        mocker, "--output-format --disallowedTools"
+    )
+    mocker.patch("providers.claude.subprocess.run", side_effect=run)
+
+    adapter = ClaudeAdapter()
+    adapter.complete([Message(role="user", content="one")], None)
+    adapter.complete([Message(role="user", content="two")], None)
+
+    help_calls = [c for c in calls if "--help" in c]
+    assert len(help_calls) == 1  # ONE cached probe feeds both checks, forever

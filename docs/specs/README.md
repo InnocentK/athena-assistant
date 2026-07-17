@@ -43,6 +43,7 @@ is the source of truth for what actually shipped.
 | [M30.4-uploads-visibility.md](M30.4-uploads-visibility.md) | Uploads visibility + attach UX | 3.0.3 |
 | [M30.5-attachment-inlining.md](M30.5-attachment-inlining.md) | Attachment content inlining | 3.0.4 |
 | [M30.6-voice-controls.md](M30.6-voice-controls.md) | Voice output/input controls | 3.0.5 |
+| [M30.7-claude-tool-restriction.md](M30.7-claude-tool-restriction.md) | Claude transport tool restriction | 3.0.6 |
 
 ## Approved, pending implementation
 

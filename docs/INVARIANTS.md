@@ -323,6 +323,14 @@ This file is the durable contract; per-release history lives in
   never a guess. The test fixture pins the REAL 2.1.206 envelope; when a new
   CLI version changes the shape, update the fixture from a live capture.
   Tests: `tests/test_claude_usage.py`.
+- **The claude transport is pure-LLM by policy (M30.7).** `-p` mode is
+  otherwise a full agent with read-only tools; `complete()` passes
+  `--disallowedTools` with an explicit denylist, feature-detected via the
+  cached help probe. The list is load-bearing: a `"*"` wildcard denies
+  NOTHING (probed live), and unknown names only warn (exit 0) — which is
+  what makes the list safe across CLI versions. Do not remove it without
+  the tool-calling safety framing (CLAUDE.md Later); extend it when new
+  agent tools appear in the CLI.
 - **Token usage is counts-only (M27.1).** Adapters may put a `usage` dict of
   token *counts* into `response.metadata["usage"]` (API adapters via
   `extract_openai_usage`); the router copies it to `ProviderCallRecord.usage`.
