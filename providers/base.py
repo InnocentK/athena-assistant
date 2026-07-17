@@ -8,6 +8,7 @@ data-exchange contract between the router and the adapters.
 
 from __future__ import annotations
 
+import tempfile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Iterator
@@ -31,6 +32,23 @@ class ProviderResponse:
     error: str | None = None
     success: bool = True
     metadata: dict[str, Any] = field(default_factory=dict)
+
+
+def neutral_cwd() -> str:
+    """
+    The working directory for CLI provider subprocesses (M30.3): the system
+    temp dir — guaranteed to be outside any repository.
+
+    Vendor CLIs (claude, gemini, …) discover project agent config by walking
+    UP from their cwd; inheriting Athena's caller cwd meant `athena` run from
+    inside any project leaked that project's instructions and hooks into the
+    chat (observed live: a repo's SessionStart hook ran the full test suite
+    per message and the answer arrived in the repo-agent persona). Every CLI
+    adapter's ``subprocess.run`` must pass ``cwd=neutral_cwd()``. User-GLOBAL
+    vendor config (e.g. ``~/.claude/``) still applies by design — that is the
+    operator's own CLI login/identity, not project context.
+    """
+    return tempfile.gettempdir()
 
 
 def extract_openai_usage(response: Any) -> dict[str, Any] | None:

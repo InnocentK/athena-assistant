@@ -37,6 +37,7 @@ from providers.base import (
     ProviderAdapter,
     ProviderResponse,
     extract_openai_usage,
+    neutral_cwd,
 )
 
 # ---------------------------------------------------------------------------
@@ -191,6 +192,7 @@ class GrokAdapter(ProviderAdapter):
                 encoding="utf-8",          # M26.8: explicit codec, don't rely on locale
                 errors="replace",          # a stray byte must not fail a good run
                 stdin=subprocess.DEVNULL,  # never block on an interactive prompt
+                cwd=neutral_cwd(),         # M30.3: no project-context bleed into chats
                 timeout=CLI_TIMEOUT,
             )
         except subprocess.TimeoutExpired:

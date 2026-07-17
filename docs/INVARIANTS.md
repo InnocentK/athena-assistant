@@ -292,7 +292,15 @@ This file is the durable contract; per-release history lives in
   skips this can hang a worker for minutes.
 - **CLI adapters** must pass `stdin=subprocess.DEVNULL` +
   `encoding="utf-8", errors="replace"` (claude/gemini/grok/hermes) — no hang on
-  an interactive prompt, no decode failure on a stray byte.
+  an interactive prompt, no decode failure on a stray byte — **and
+  `cwd=neutral_cwd()` (M30.3)**: vendor CLIs discover project agent config
+  (CLAUDE.md, GEMINI.md, hooks) by walking UP from their cwd, so inheriting
+  the caller's cwd leaks any project's instructions/hooks into Athena chats
+  (observed live: a repo's SessionStart hook ran the full test suite per
+  message and claude answered in the repo-agent persona). Applies to EVERY
+  adapter subprocess, including probes (`claude --help`). User-global vendor
+  config (`~/.claude/` login/identity) still applies by design.
+  Test-pinned in `tests/test_provider_robustness.py`.
 - **Routing-override validation.** `PATCH /profile` and `POST/PATCH
   /saved/actions` share `_validate_routing_mode` + `_known_provider_names`; the
   CLI validates `--provider`. `ProviderRouter._get_ordered_names` falls back to

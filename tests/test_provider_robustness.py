@@ -155,6 +155,30 @@ def test_cli_adapters_harden_subprocess(monkeypatch, mocker, module_path, adapte
     assert captured.get("stdin") is subprocess.DEVNULL, f"{adapter_name} missing stdin=DEVNULL"
     assert captured.get("encoding") == "utf-8", f"{adapter_name} missing encoding"
     assert captured.get("errors") == "replace", f"{adapter_name} missing errors=replace"
+    # M30.3: subprocesses must never inherit the caller's cwd — vendor CLIs
+    # discover project agent config (CLAUDE.md, hooks) by walking up from it.
+    import tempfile
+
+    assert captured.get("cwd") == tempfile.gettempdir(), f"{adapter_name} missing neutral cwd (M30.3)"
+
+
+def test_claude_help_probe_uses_neutral_cwd(mocker):
+    """M30.3: the `claude --help` JSON-support probe must not inherit a
+    project cwd either — hooks and project config load per invocation."""
+    import tempfile
+
+    from providers.claude import ClaudeAdapter
+
+    calls: list[dict] = []
+
+    def _fake_run(*args, **kwargs):
+        calls.append(dict(kwargs))
+        return mocker.MagicMock(returncode=0, stdout="--output-format", stderr="")
+
+    mocker.patch("providers.claude.subprocess.run", side_effect=_fake_run)
+
+    assert ClaudeAdapter()._supports_json_output() is True
+    assert calls and calls[0].get("cwd") == tempfile.gettempdir()
 
 
 # ---------------------------------------------------------------------------

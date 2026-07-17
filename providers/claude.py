@@ -32,7 +32,7 @@ import shutil
 import subprocess
 from typing import Any
 
-from providers.base import Message, ProviderAdapter, ProviderResponse
+from providers.base import Message, ProviderAdapter, ProviderResponse, neutral_cwd
 
 
 def _build_prompt(messages: list[Message], system_prompt: str | None) -> str:
@@ -112,6 +112,7 @@ class ClaudeAdapter(ProviderAdapter):
                     encoding="utf-8",
                     errors="replace",
                     stdin=subprocess.DEVNULL,
+                    cwd=neutral_cwd(),  # M30.3: never inherit a project directory
                     timeout=10,
                 )
                 self._json_supported = "--output-format" in (
@@ -140,6 +141,7 @@ class ClaudeAdapter(ProviderAdapter):
                 encoding="utf-8",          # M26.8: explicit codec, don't rely on locale
                 errors="replace",          # a stray byte must not fail a good run
                 stdin=subprocess.DEVNULL,  # never block on an interactive prompt
+                cwd=neutral_cwd(),         # M30.3: no project-context bleed into chats
                 timeout=120,
             )
         except subprocess.TimeoutExpired:

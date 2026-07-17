@@ -39,6 +39,7 @@ is the source of truth for what actually shipped.
 | [M30-streaming.md](M30-streaming.md) | Streaming (SSE) — the major release | **3.0.0** |
 | [M30.1-taskfile-dx.md](M30.1-taskfile-dx.md) | Taskfile DX (install/update/doctor) | no bump |
 | [M30.2-mypy-gate-fix.md](M30.2-mypy-gate-fix.md) | Green mypy gate + CalDAV ETag fix | 3.0.1 |
+| [M30.3-neutral-cwd.md](M30.3-neutral-cwd.md) | Neutral cwd for CLI provider subprocesses | 3.0.2 |
 
 ## Approved, pending implementation
 

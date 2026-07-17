@@ -294,6 +294,12 @@ from the "Later / unscheduled" list below (spec first, as always).
   pointing at: `caldav.dav` doesn't exist in caldav 3.x, so etags silently
   recorded as `""`; GetEtag now imports from `caldav.elements.dav`
   (regression-pinned). → `docs/specs/M30.2-mypy-gate-fix.md`
+- **M30.3 — neutral cwd for CLI provider subprocesses** (→ 3.0.2) —
+  *shipped.* Vendor CLIs discover project agent config by walking up from
+  cwd; `athena` run inside any repo leaked that repo's CLAUDE.md/hooks into
+  chats (observed live: hook ran the test suite per message). All adapter
+  subprocesses (probes included) now run from `neutral_cwd()`; user-global
+  vendor config still applies. → `docs/specs/M30.3-neutral-cwd.md`
 
 **Later / unscheduled:** Ollama phase 2 (multi-model, embeddings, tools);
 generic OpenAI-compatible local-provider abstraction; saved-items surfacing

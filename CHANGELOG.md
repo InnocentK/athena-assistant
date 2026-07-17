@@ -4,6 +4,26 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [3.0.2] — Milestone 30.3 — Neutral cwd for CLI provider subprocesses
+
+**App bumped to 3.0.2.** Spec: `docs/specs/M30.3-neutral-cwd.md`. Found live:
+`athena --provider claude "hello"` run from inside the Athena repo answered
+as the repo's coding agent after 54 seconds — the claude CLI inherited the
+caller's cwd, discovered the project's `CLAUDE.md` + SessionStart hook (which
+ran the full test suite per message), and pulled ~15k tokens of project
+context into a chat turn.
+
+### Fixed
+- All five CLI-adapter subprocess calls (claude completion + `--help` probe,
+  gemini, grok-cli, hermes) now pass `cwd=neutral_cwd()` (the system temp
+  dir, `providers/base.py`) so vendor CLIs cannot discover project-level
+  agent config from wherever `athena` happens to be invoked. User-global
+  vendor config (`~/.claude/` login/identity) still applies by design.
+  Test-pinned per adapter, probe included.
+
+### Notes
+- Gate: ruff + mypy (exit 0) + **595 pytest** + 28 vitest.
+
 ## [3.0.1] — Milestone 30.2 — Green mypy gate + CalDAV ETag fix
 
 **App bumped to 3.0.1.** Spec: `docs/specs/M30.2-mypy-gate-fix.md`. Found via

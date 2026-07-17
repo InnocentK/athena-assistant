@@ -37,7 +37,7 @@ import re
 import shutil
 import subprocess
 
-from providers.base import Message, ProviderAdapter, ProviderResponse
+from providers.base import Message, ProviderAdapter, ProviderResponse, neutral_cwd
 
 DEFAULT_BIN: str = "hermes"
 DEFAULT_TIMEOUT: float = 120.0
@@ -145,6 +145,7 @@ class HermesAdapter(ProviderAdapter):
                 encoding="utf-8",          # M26.8: explicit codec for the box's non-ASCII output
                 errors="replace",          # a stray byte must not fail a good run
                 stdin=subprocess.DEVNULL,  # never block waiting on an interactive prompt
+                cwd=neutral_cwd(),         # M30.3: no project-context bleed into chats
                 timeout=timeout,
             )
         except subprocess.TimeoutExpired:

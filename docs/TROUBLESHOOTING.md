@@ -39,6 +39,21 @@ directory that may not be on your PATH (pip prints a warning like
 - Install inside an activated virtualenv (its `bin/` is on PATH while active).
 - Use `python -m cli "..."` instead — no PATH changes needed.
 
+## Answers sound like a coding agent for the directory I'm in (or are very slow there)
+
+Seen on versions **before 3.0.2** when running `athena` from inside a project
+directory: CLI provider subprocesses inherited your shell's cwd, and vendor
+CLIs (claude, gemini, …) discover project agent config by walking up from it —
+so the provider loaded that project's `CLAUDE.md`/hooks, ran any SessionStart
+hook per message (this is the slowness), and answered in that project's agent
+persona instead of as Athena.
+
+Fixed in 3.0.2: adapter subprocesses run from a neutral directory (the system
+temp dir). On older versions, run `athena` from a directory that isn't inside
+a repo. Note the deliberate boundary: your user-global vendor config
+(`~/.claude/` login/identity) still applies — that's how the CLI
+authenticates, not project context.
+
 ## A provider shows "available" but answers fail (or vice versa)
 
 Availability is a **config-based** check, not a guarantee of a working call:
