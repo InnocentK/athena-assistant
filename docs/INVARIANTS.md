@@ -454,8 +454,14 @@ This file is the durable contract; per-release history lives in
   correctness bug. Registration (`static/js/pwa.js`) stays guarded by
   `'serviceWorker' in navigator` so plain-HTTP origins degrade to an ordinary
   page. Do not broaden the cache allowlist or drop the registration guard.
+- **Voice prefs are browser-local by design (M30.6).** `athena-voice-prefs`
+  in `localStorage` (guarded — private-mode throws fall back to memory);
+  speak-responses and transcript auto-send default OFF. Do NOT migrate these
+  into profile.yaml's editable set — they are per-device accessibility
+  settings, and both TTS call sites must stay pref-gated (test-pinned).
 - Tests: `tests/test_ui_correctness.py` (source-structure guards; no JS runtime
-  in the suite by design); `tests/test_pwa.py` + `tests/js/pwa.test.js` (M26.28).
+  in the suite by design); `tests/test_pwa.py` + `tests/js/pwa.test.js` (M26.28);
+  `tests/js/voicePrefs.test.js` (M30.6).
 
 ## CLI (M16/M17/M25/M26.6)
 

@@ -4,6 +4,34 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [3.0.5] — Milestone 30.6 — Voice output/input controls
+
+**App bumped to 3.0.5.** Spec: `docs/specs/M30.6-voice-controls.md`. From the
+desktop triage: answers were read aloud unconditionally in an unpleasant
+default voice, the mic stopped at the first pause, and transcripts
+auto-sent.
+
+### Added
+- **Settings → Voice section** (Profile tab): per-BROWSER preferences,
+  instant-apply, persisted in `localStorage` (`athena-voice-prefs`) — NOT in
+  profile.yaml (device-level accessibility settings; the narrow editable
+  profile set is untouched). Defaults per the user's direction: **speak
+  responses OFF**, **auto-send transcript OFF** (dictation lands in the
+  input for review, like typing), voice = browser default, continuous mic
+  OFF.
+- **Voice picker** from the browser's system voices
+  (`speechSynthesis.getVoices()`, async-load handled via `voiceschanged`) —
+  TTS is browser-side and provider-independent; the genuinely-human upgrade
+  remains the M31.1 Piper endpoint on the roadmap.
+- **Continuous mic mode**: keep listening across pauses until the mic is
+  clicked again; final results accumulate and deliver as one transcript.
+  Default remains the M5 stop-on-pause behavior.
+
+### Notes
+- Pre-M30.6 behavior (always speak, always auto-send) remains reachable by
+  flipping the toggles.
+- Gate: ruff + mypy exit 0 + **612 pytest** + **34 vitest** (+6 jsdom).
+
 ## [3.0.4] — Milestone 30.5 — Attachment content inlining
 
 **App bumped to 3.0.4.** Spec: `docs/specs/M30.5-attachment-inlining.md`.

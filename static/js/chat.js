@@ -36,6 +36,42 @@ const _panelLoadToken = { memory: 0, settings: 0, history: 0 };
 
 
 /* ---------------------------------------------------------
+   Voice preferences (M30.6) — per-BROWSER, localStorage-persisted.
+   Deliberately NOT in profile.yaml: these are device-level
+   accessibility/interaction settings (phone ≠ desktop needs).
+   --------------------------------------------------------- */
+const _VOICE_PREFS_KEY = "athena-voice-prefs";
+const _VOICE_PREF_DEFAULTS = { speak: false, voiceName: "", autoSend: false, continuous: false };
+let _voicePrefsMem = null; // fallback when localStorage throws (private mode)
+
+function getVoicePrefs() {
+  if (_voicePrefsMem) return Object.assign({}, _VOICE_PREF_DEFAULTS, _voicePrefsMem);
+  try {
+    const raw = window.localStorage.getItem(_VOICE_PREFS_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return Object.assign({}, _VOICE_PREF_DEFAULTS, parsed);
+  } catch (_) {
+    _voicePrefsMem = {};
+    return Object.assign({}, _VOICE_PREF_DEFAULTS);
+  }
+}
+
+function setVoicePref(key, value) {
+  const prefs = getVoicePrefs();
+  prefs[key] = value;
+  if (_voicePrefsMem) {
+    _voicePrefsMem = prefs;
+    return;
+  }
+  try {
+    window.localStorage.setItem(_VOICE_PREFS_KEY, JSON.stringify(prefs));
+  } catch (_) {
+    _voicePrefsMem = prefs;
+  }
+}
+
+
+/* ---------------------------------------------------------
    DOM references (populated after DOMContentLoaded)
    --------------------------------------------------------- */
 let messagesEl;
@@ -67,7 +103,13 @@ document.addEventListener("DOMContentLoaded", () => {
     voice.onTranscript = function(text) {
       messageInput.value = text;
       autoResizeTextarea();
-      sendMessage();
+      // M30.6: auto-send is opt-in — by default the transcript lands in the
+      // input for review, exactly like typed text.
+      if (getVoicePrefs().autoSend) {
+        sendMessage();
+      } else {
+        messageInput.focus();
+      }
     };
 
     voice.onError = function(msg) {
@@ -91,6 +133,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (voice.isListening) {
         voice.stopListening();
       } else {
+        // M30.6: continuous mode keeps listening across pauses until the
+        // button is clicked again; default stays stop-on-pause.
+        voice.continuous = getVoicePrefs().continuous;
         voice.startListening();
       }
     });
@@ -364,9 +409,11 @@ async function _sendStreaming(text, historyToSend) {
   if (data.provider) {
     updateProviderBadge(data.provider);
   }
-  if (typeof voice !== "undefined" && voice.isTTSSupported) {
+  // M30.6: reading answers aloud is opt-in (default off), with the chosen voice.
+  const vpStream = getVoicePrefs();
+  if (vpStream.speak && typeof voice !== "undefined" && voice.isTTSSupported) {
     try {
-      voice.speak(fullText);
+      voice.speak(fullText, vpStream.voiceName);
     } catch (_) {}
   }
   appendDiagnostics(data.diagnostics);
@@ -437,11 +484,12 @@ async function _sendBuffered(text, historyToSend) {
     if (data.provider) {
       updateProviderBadge(data.provider);
     }
-    // Speak the response if TTS is available. Guarded so a missing voice.js
-    // (or a speak() error) can't break the answer that already rendered.
-    if (typeof voice !== "undefined" && voice.isTTSSupported) {
+    // Speak the response if enabled (M30.6: opt-in, default off). Guarded so
+    // a missing voice.js (or a speak() error) can't break the rendered answer.
+    const vpBuf = getVoicePrefs();
+    if (vpBuf.speak && typeof voice !== "undefined" && voice.isTTSSupported) {
       try {
-        voice.speak(data.response);
+        voice.speak(data.response, vpBuf.voiceName);
       } catch (_) {}
     }
   }
@@ -1335,6 +1383,52 @@ async function loadSettingsProfile() {
     body.appendChild(saveBtn);
     body.appendChild(statusEl);
 
+    // --- Voice (M30.6) — per-BROWSER prefs, applied instantly (localStorage).
+    // Deliberately separate from the server-persisted "Save settings" above.
+    body.appendChild(_settingsSectionTitle("Voice"));
+    const vp = getVoicePrefs();
+    body.appendChild(_voiceToggleRow("Speak responses aloud", "speak", vp.speak));
+
+    const voiceSelect = document.createElement("select");
+    voiceSelect.className = "settings-edit-select";
+    function _populateVoices() {
+      const current = getVoicePrefs().voiceName || "";
+      voiceSelect.textContent = "";
+      const def = document.createElement("option");
+      def.value = "";
+      def.textContent = "(browser default)";
+      voiceSelect.appendChild(def);
+      const voices = typeof voice !== "undefined" ? voice.listVoices() : [];
+      voices.forEach(function (v) {
+        const o = document.createElement("option");
+        o.value = v.name;
+        o.textContent = v.name + (v.lang ? " (" + v.lang + ")" : "");
+        voiceSelect.appendChild(o);
+      });
+      voiceSelect.value = current;
+      if (voiceSelect.value !== current) voiceSelect.value = ""; // voice vanished
+    }
+    _populateVoices();
+    // Voices load asynchronously in some browsers — repopulate when they land.
+    if (typeof voice !== "undefined" && voice.isTTSSupported &&
+        window.speechSynthesis && window.speechSynthesis.addEventListener) {
+      try {
+        window.speechSynthesis.addEventListener("voiceschanged", _populateVoices, { once: true });
+      } catch (_) {}
+    }
+    voiceSelect.addEventListener("change", function () {
+      setVoicePref("voiceName", voiceSelect.value);
+    });
+    body.appendChild(_settingsControlRow("Voice", voiceSelect));
+
+    body.appendChild(_voiceToggleRow("Auto-send voice transcript", "autoSend", vp.autoSend));
+    body.appendChild(_voiceToggleRow("Keep listening until stopped", "continuous", vp.continuous));
+    const voiceNote = document.createElement("div");
+    voiceNote.className = "settings-note";
+    voiceNote.textContent =
+      "Voice settings apply immediately and are saved in this browser (not the profile).";
+    body.appendChild(voiceNote);
+
     // --- Read-only context (not editable in this milestone) ---
     body.appendChild(_settingsSectionTitle("Tools"));
     const tools = Array.isArray(p.allowed_tools) ? p.allowed_tools : [];
@@ -1361,6 +1455,17 @@ function _settingsSelect(options, current) {
     sel.appendChild(o);
   });
   return sel;
+}
+
+/** M30.6: one instant-apply voice-pref checkbox row (localStorage-backed). */
+function _voiceToggleRow(label, prefKey, checked) {
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.checked = !!checked;
+  cb.addEventListener("change", function () {
+    setVoicePref(prefKey, cb.checked);
+  });
+  return _settingsControlRow(label, cb);
 }
 
 function _settingsControlRow(key, controlEl) {

@@ -67,11 +67,27 @@ class VoiceController {
     this.onListeningStop = function () {};
 
     /**
+     * M30.6: when true, recognition keeps listening across pauses until
+     * stopListening() is called; final results accumulate and onTranscript
+     * fires ONCE on end. When false (default), classic M5 single-utterance
+     * behavior: stop at the first pause, deliver immediately.
+     * @type {boolean}
+     */
+    this.continuous = false;
+
+    /**
      * Internal reference to the active SpeechRecognition instance.
      * @type {SpeechRecognition|null}
      * @private
      */
     this._recognition = null;
+
+    /**
+     * Accumulated final transcripts for continuous mode (M30.6).
+     * @type {string[]}
+     * @private
+     */
+    this._buffer = [];
   }
 
   /**
@@ -103,13 +119,25 @@ class VoiceController {
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
     var recognition = new SpeechRecognitionImpl();
-    recognition.continuous = false;
+    // M30.6: continuous mode keeps the mic open across pauses; the user ends
+    // the session explicitly (click-to-stop). Default stays single-utterance.
+    recognition.continuous = this.continuous;
     recognition.interimResults = false;
     recognition.lang = "en-US";
 
     var self = this;
+    this._buffer = [];
 
     recognition.onresult = function (event) {
+      if (self.continuous) {
+        // Accumulate every FINAL result; delivery happens once, on end.
+        for (var i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            self._buffer.push(event.results[i][0].transcript);
+          }
+        }
+        return;
+      }
       var transcript = event.results[0][0].transcript;
       self.onTranscript(transcript);
     };
@@ -121,6 +149,13 @@ class VoiceController {
     recognition.onend = function () {
       self.isListening = false;
       self.onListeningStop();
+      if (self.continuous && self._buffer.length > 0) {
+        var joined = self._buffer.join(" ").replace(/\s+/g, " ").trim();
+        self._buffer = [];
+        if (joined) {
+          self.onTranscript(joined);
+        }
+      }
     };
 
     this._recognition = recognition;
@@ -154,8 +189,10 @@ class VoiceController {
    *   See voice/stubs.py for full instructions.
    *
    * @param {string} text - The text to synthesise and speak.
+   * @param {string} [voiceName] - M30.6: a SpeechSynthesis voice name from
+   *   listVoices(); unknown/empty falls back to the browser default.
    */
-  speak(text) {
+  speak(text, voiceName) {
     if (!this.isTTSSupported) {
       return;
     }
@@ -170,7 +207,34 @@ class VoiceController {
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
 
+    if (voiceName) {
+      var voices = this.listVoices();
+      for (var i = 0; i < voices.length; i++) {
+        if (voices[i].name === voiceName) {
+          utterance.voice = voices[i];
+          break;
+        }
+      }
+      // No match → browser default (voices load async; never block speech).
+    }
+
     window.speechSynthesis.speak(utterance);
+  }
+
+  /**
+   * M30.6: the available SpeechSynthesis voices (may be empty until the
+   * browser fires `voiceschanged`). Safe to call when TTS is unsupported.
+   * @returns {SpeechSynthesisVoice[]}
+   */
+  listVoices() {
+    if (!this.isTTSSupported || !window.speechSynthesis.getVoices) {
+      return [];
+    }
+    try {
+      return window.speechSynthesis.getVoices() || [];
+    } catch (_) {
+      return [];
+    }
   }
 
   /**

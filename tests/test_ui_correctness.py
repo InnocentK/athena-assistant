@@ -96,3 +96,30 @@ def test_files_panel_fetches_uploads_pattern():
     # M30.4: the Files tab merges the shallow "*" listing with `uploads/*` so
     # uploaded files are visible; the uploads fetch is best-effort.
     assert '"uploads/*"' in _CHAT_JS or "'uploads/*'" in _CHAT_JS
+
+
+# --- M30.6: voice prefs are browser-local, opt-in, and complete ---------------
+
+_VOICE_JS = (_ROOT / "static" / "js" / "voice.js").read_text(encoding="utf-8")
+
+
+def test_voice_prefs_scaffolding_present():
+    # localStorage-backed prefs with silent/off defaults (M30.6).
+    assert '_VOICE_PREFS_KEY = "athena-voice-prefs"' in _CHAT_JS
+    assert "speak: false" in _CHAT_JS       # read-aloud is opt-in
+    assert "autoSend: false" in _CHAT_JS    # transcript review is the default
+    # both TTS call sites are pref-gated (never unconditional again)
+    assert _CHAT_JS.count(".speak &&") == 2
+
+
+def test_voice_settings_section_rendered():
+    assert '_settingsSectionTitle("Voice")' in _CHAT_JS
+    assert '"Speak responses aloud"' in _CHAT_JS
+    assert '"Auto-send voice transcript"' in _CHAT_JS
+    assert '"Keep listening until stopped"' in _CHAT_JS
+
+
+def test_voice_js_supports_continuous_and_voice_picker():
+    assert "this.continuous" in _VOICE_JS
+    assert "listVoices()" in _VOICE_JS
+    assert "voiceschanged" in _CHAT_JS  # async voice loading handled
