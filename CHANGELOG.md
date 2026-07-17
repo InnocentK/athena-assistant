@@ -4,6 +4,37 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [3.0.3] — Milestone 30.4 — Uploads visibility + attach UX
+
+**App bumped to 3.0.3.** Spec: `docs/specs/M30.4-uploads-visibility.md`. From
+live desktop testing: uploads WORKED (files verified on disk) but looked
+broken — three UI defects created the illusion (and the agentic claude
+transport, searching its M30.3 neutral cwd, confidently misdiagnosed it).
+
+### Fixed
+- **Raw `<input type="file">` rendered next to the 📎 button** — it carried
+  `class="hidden"` but chat.css has only *scoped* `.hidden` rules, never a
+  bare one, so the browser default applied (visible since M29.3). Now hidden
+  via its own `#attach-input` rule (deliberately NOT a global `.hidden`).
+- **Uploaded files were invisible in the Files tab** — the M20-era listing
+  globs `*` non-recursively, one level short of `data/uploads/<file>`. The
+  tab now merges the shallow listing with a best-effort `uploads/*` search.
+- **Directories listed as clickable "files"** whose preview 400s —
+  `search_files()` now returns files only.
+
+### Docs (triage decisions recorded, user-approved)
+- INVARIANTS: integrations settings are **read-only by design** (a no-auth
+  LAN-reachable UI must never write credentials); search results files-only.
+- TROUBLESHOOTING: "the model *says* it's a different model than the label"
+  — the meta line is ground truth; self-reports come from configured
+  identity + replayed history (observed: grok-4.3 claiming to be Claude
+  Opus because a prior claude turn said so in context).
+- CLAUDE.md Later/unscheduled: provider enable/disable UI toggles;
+  failure-cooldown for repeatedly failing providers (the observed 28–52s
+  "gemini tax" per message); probe `include_usage` support on grok/ollama
+  streams (web UI streams by default now, so those turns show "Tokens:
+  unavailable").
+
 ## [3.0.2] — Milestone 30.3 — Neutral cwd for CLI provider subprocesses
 
 **App bumped to 3.0.2.** Spec: `docs/specs/M30.3-neutral-cwd.md`. Found live:

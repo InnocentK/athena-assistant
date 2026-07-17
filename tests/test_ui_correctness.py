@@ -79,3 +79,20 @@ def test_post_save_rerender_is_tab_guarded():
 def test_history_count_css_rule_present():
     assert ".history-count {" in _CHAT_CSS
     assert ".settings-note {" in _CHAT_CSS
+
+
+# --- M30.4: attach input hidden; Files tab surfaces uploads ------------------
+
+def test_attach_input_is_css_hidden():
+    # There is deliberately NO bare `.hidden` rule in chat.css (scoped users
+    # manage their own hiding), so the file input needs its own rule — without
+    # it the native "Choose File" control renders in the footer.
+    assert "#attach-input {" in _CHAT_CSS
+    idx = _CHAT_CSS.find("#attach-input {")
+    assert "display: none" in _CHAT_CSS[idx:idx + 80]
+
+
+def test_files_panel_fetches_uploads_pattern():
+    # M30.4: the Files tab merges the shallow "*" listing with `uploads/*` so
+    # uploaded files are visible; the uploads fetch is best-effort.
+    assert '"uploads/*"' in _CHAT_JS or "'uploads/*'" in _CHAT_JS

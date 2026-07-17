@@ -279,3 +279,32 @@ def test_read_file_small_text_untouched(fm, tmp_path: Path):
 
     assert result["content"] == "hello Athena"
     assert result["truncated"] is False
+
+
+# ---------------------------------------------------------------------------
+# M30.4 — search results are files only; uploads are reachable one level down
+# ---------------------------------------------------------------------------
+
+
+def test_search_excludes_directories(fm, tmp_path):
+    """A bare directory must never appear as a search result — the UI renders
+    results as previewable files and a directory preview 400s (observed live
+    with data/uploads)."""
+    uploads = tmp_path / "data" / "uploads"
+    uploads.mkdir()
+    (uploads / "doc.txt").write_text("hello")
+
+    results = fm.search_files("*")
+    assert not any(r.endswith("data/uploads") for r in results), results
+    assert all("uploads" != r.rsplit("/", 1)[-1] for r in results)
+
+
+def test_search_uploads_pattern_lists_nested_files(fm, tmp_path):
+    """The `uploads/*` pattern (used by the Files tab since M30.4) surfaces
+    uploaded files one level below the shallow `*` listing."""
+    uploads = tmp_path / "data" / "uploads"
+    uploads.mkdir()
+    (uploads / "pom.xml").write_text("<project/>")
+
+    results = fm.search_files("uploads/*")
+    assert any(r.endswith("data/uploads/pom.xml") for r in results), results

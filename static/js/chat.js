@@ -1723,17 +1723,39 @@ async function loadHistoryFiles(showInternal) {
   }
 
   try {
-    const res = await fetch("/files/search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pattern: "*", exclude_internal: !showInternal }),
-    });
+    // M30.4: the shallow "*" listing plus one level into uploads/, so
+    // uploaded files are visible without turning the panel into a full
+    // recursive tree. The uploads fetch is best-effort — its failure must
+    // never break the primary listing.
+    function search(pattern) {
+      return fetch("/files/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pattern: pattern, exclude_internal: !showInternal }),
+      });
+    }
+    const [res, resUploads] = await Promise.all([
+      search("*"),
+      search("uploads/*").catch(function () { return null; }),
+    ]);
     if (token !== _panelLoadToken.history) return; // superseded by a newer load
     if (!res.ok) {
       _historyMessage(body, "Failed to list files.", "history-error");
       return;
     }
     const paths = await res.json();
+    if (resUploads && resUploads.ok) {
+      try {
+        const uploadPaths = await resUploads.json();
+        if (Array.isArray(uploadPaths)) {
+          uploadPaths.forEach(function (p) {
+            if (paths.indexOf(p) === -1) paths.push(p);
+          });
+        }
+      } catch (_) {
+        // best-effort — the primary listing stands on its own
+      }
+    }
     if (token !== _panelLoadToken.history) return;
     if (!Array.isArray(paths) || paths.length === 0) {
       count.textContent = "0 files";

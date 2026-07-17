@@ -103,3 +103,24 @@ def test_files_read_binary_returns_200_not_500(client, tmp_project):
     body = resp.json()
     assert body["truncated"] is False
     assert "�" in body["content"]
+
+
+# ---------------------------------------------------------------------------
+# M30.4 — uploads visible via the API; no directory entries
+# ---------------------------------------------------------------------------
+
+
+def test_search_api_lists_uploads_and_no_directories(client):
+    """POST /files/search: `uploads/*` returns an uploaded file; `*` returns
+    no bare directory entries (the Files tab renders results as previewable)."""
+    import core.config as cc
+
+    uploads = cc.APP_ROOT / "data" / "uploads"
+    uploads.mkdir(parents=True, exist_ok=True)
+    (uploads / "note.txt").write_text("uploaded")
+
+    shallow = client.post("/files/search", json={"pattern": "*"}).json()
+    assert not any(p.endswith("data/uploads") for p in shallow), shallow
+
+    nested = client.post("/files/search", json={"pattern": "uploads/*"}).json()
+    assert any(p.endswith("data/uploads/note.txt") for p in nested), nested

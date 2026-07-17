@@ -507,6 +507,12 @@ This file is the durable contract; per-release history lives in
   flag that sets env must get the same treatment or it leaks across tests.
 - Tests: `tests/test_profile_switch.py`.
 
+- **Integrations settings are READ-ONLY by design (M30.4 decision).** Athena
+  is a single-user, no-auth, LAN-reachable web UI: it must never write
+  credentials (`.env`) or enable outbound integrations from the browser.
+  This is a security boundary, not a missing feature — do not "complete" it.
+  (Provider enable/disable toggles are a separate, credential-free question
+  — parked in CLAUDE.md Later/unscheduled with its router re-init caveats.)
 - **`PATCH /profile` is the only UI write to `profile.yaml`.** It validates
   before writing, touches only `system_prompt` / `routing.mode` /
   `routing.preferred_provider`, persists with `save_yaml(..., sort_keys=False)`
@@ -515,6 +521,11 @@ This file is the durable contract; per-release history lives in
   A validation failure must write nothing and mutate nothing. Do not widen the
   editable set or switch away from in-place mutation without revisiting the
   persistence/runtime/CLI interactions.
+
+- **`search_files()` returns FILES only (M30.4).** The Files tab (and any
+  consumer) renders results as previewable items; a bare directory in the
+  list produces a guaranteed-400 click (observed live with `data/uploads`).
+  Keep the `is_file()` guard.
 
 ## File uploads (M29.3)
 

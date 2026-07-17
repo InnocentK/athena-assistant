@@ -320,6 +320,15 @@ body {
   cursor: not-allowed;
 }
 
+/* M30.4: the native file input is triggered programmatically by #attach-btn
+   and must NEVER render. There is deliberately no bare `.hidden` rule in this
+   stylesheet (every `.hidden` user is scoped and manages its own hiding), so
+   the input needs its own rule — without it the browser-default
+   "Choose File" control appears in the footer (observed live). */
+#attach-input {
+  display: none;
+}
+
 /* Attach button (M29.3) — quiet sibling of the send button. */
 #attach-btn {
   flex: 0 0 auto;

@@ -304,8 +304,16 @@ from the "Later / unscheduled" list below (spec first, as always).
 **Agreed direction (user-approved 2026-07-16, spec each before implementing):**
 
 *Remainder of 3.0.z — bug-fix window.* Fixes for issues found in the user's
-post-release testing, each its own small milestone (M30.4, M30.5, …). No
-feature work in 3.0.z.
+post-release testing, each its own small milestone. Approved queue from the
+2026-07-17 desktop triage: **M30.4** uploads visibility + attach UX (→
+3.0.3, *shipped*); **M30.5** attachment semantics — inline small TEXT
+attachments server-side, provider-agnostic, images stay reference-only (→
+3.0.4); **M30.6** voice controls — Settings "Voice" section persisted
+per-browser via localStorage: speak-responses toggle DEFAULT OFF, voice
+picker from system voices, transcript auto-send toggle DEFAULT OFF,
+continuous-mic mode (→ 3.0.5; deliberately builds the scaffolding M31.0
+reuses); **M30.7** claude transport tool restriction —
+`--disallowedTools` for a pure-LLM chat (→ 3.0.6).
 
 *M31 — Voice epic (3.1.y).* Live-voice research (products, protocols,
 pricing, self-hosted pipelines) is summarized in the M31.0 spec when written;
@@ -332,7 +340,14 @@ the decision record is this entry.
 - Vendor realtime bridges are Later/unscheduled (below), not part of M31
   unless explicitly promoted.
 
-**Later / unscheduled:** vendor realtime-voice bridge (OpenAI
+**Later / unscheduled:** per-provider **enable/disable toggles in Settings**
+(writes providers.yaml — needs router re-init semantics; use case observed
+live: an available-but-broken CLI provider); a **failure cooldown /
+circuit-breaker** for repeatedly failing providers (observed: ~28–52s wasted
+per message when a broken gemini preceded the answering provider); **probe
+`stream_options={"include_usage"}` support on grok/ollama** (the web UI
+streams by default since M30, so those turns show "Tokens: unavailable" —
+honest but a UX regression vs buffered 2.x); vendor realtime-voice bridge (OpenAI
 gpt-realtime / Gemini Live / Grok Voice Agent as an explicit opt-in voice
 transport: Athena mints ephemeral client tokens, the browser connects
 directly to the vendor, transcripts are recorded into history afterward —

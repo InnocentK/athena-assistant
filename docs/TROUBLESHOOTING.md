@@ -54,6 +54,23 @@ a repo. Note the deliberate boundary: your user-global vendor config
 (`~/.claude/` login/identity) still applies — that's how the CLI
 authenticates, not project context.
 
+## The model SAYS it's a different model than the label under the answer
+
+Trust the label. The `provider / model` meta line comes from the execution
+record (the CLI's JSON envelope or the API response) for that exact call —
+it is ground truth. The model's *self-description* is not: models have no
+runtime self-knowledge, so they answer from whatever their context suggests.
+Two mechanisms produce confident wrong answers (both observed live):
+
+- **Configured identity ≠ executed model.** Claude Code injects the
+  *configured* model name into its system prompt; if the call actually
+  executes on another model (e.g. a usage-limit fallback to haiku), the
+  model still claims the configured one. Check what really ran:
+  `claude -p "hi" --output-format json | jq .modelUsage`.
+- **History replay.** A wrong claim in an earlier turn is replayed as
+  context, so a *different* provider repeats it (observed: grok-4.3
+  answering "I'm Claude Opus" because a prior claude turn said so).
+
 ## A provider shows "available" but answers fail (or vice versa)
 
 Availability is a **config-based** check, not a guarantee of a working call:

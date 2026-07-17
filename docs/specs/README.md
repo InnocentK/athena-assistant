@@ -40,6 +40,7 @@ is the source of truth for what actually shipped.
 | [M30.1-taskfile-dx.md](M30.1-taskfile-dx.md) | Taskfile DX (install/update/doctor) | no bump |
 | [M30.2-mypy-gate-fix.md](M30.2-mypy-gate-fix.md) | Green mypy gate + CalDAV ETag fix | 3.0.1 |
 | [M30.3-neutral-cwd.md](M30.3-neutral-cwd.md) | Neutral cwd for CLI provider subprocesses | 3.0.2 |
+| [M30.4-uploads-visibility.md](M30.4-uploads-visibility.md) | Uploads visibility + attach UX | 3.0.3 |
 
 ## Approved, pending implementation
 

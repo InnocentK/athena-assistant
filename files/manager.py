@@ -260,6 +260,11 @@ class FileManager:
                 if match_path in seen:
                     continue
                 seen.add(match_path)
+                # M30.4: results are FILES only — bare directories rendered as
+                # clickable "files" in the UI whose preview then 400s (observed
+                # live with data/uploads).
+                if not match_path.is_file():
+                    continue
                 try:
                     rel = match_path.relative_to(APP_ROOT)
                     results.append(rel.as_posix())
