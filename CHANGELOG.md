@@ -4,6 +4,31 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [3.0.4] — Milestone 30.5 — Attachment content inlining
+
+**App bumped to 3.0.4.** Spec: `docs/specs/M30.5-attachment-inlining.md`.
+"Attach a text file and ask about it" never actually worked by design —
+`[Attached file: <path>]` was a bare reference no provider could act on (API
+transports have no filesystem; the agentic claude transport correctly runs
+in a neutral cwd since M30.3, searched there, and misdiagnosed the upload as
+broken).
+
+### Added
+- `core/chat_turn.inline_attachments()` — applied inside the shared
+  `build_turn_messages()` seam, so web AND CLI get it identically: the NEW
+  message's reference lines are expanded with the file's content for the
+  **provider-bound copy only**. History, the UI bubble, memory extraction,
+  and exports keep the raw reference form; replayed history turns are not
+  re-inlined (cost bound).
+- Reads go through **FileManager** — the allowlist governs, like every
+  read. Text extensions only (conservative list); 32 KB cap per file with an
+  explicit truncation marker; max 3 attachments per message; best-effort —
+  any failure leaves the reference byte-identical. Images/binaries stay
+  reference-only until a vision path exists (Later).
+
+### Notes
+- Gate: ruff + mypy exit 0 + **609 pytest** + 28 vitest.
+
 ## [3.0.3] — Milestone 30.4 — Uploads visibility + attach UX
 
 **App bumped to 3.0.3.** Spec: `docs/specs/M30.4-uploads-visibility.md`. From

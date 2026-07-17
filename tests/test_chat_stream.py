@@ -195,3 +195,37 @@ def test_buffered_chat_unchanged_smoke(client, monkeypatch):
     body = resp.json()
     assert body["response"] == "buffered"
     assert body["success"] is True
+
+
+def test_stream_inlines_attachment_for_provider_but_records_raw(client, monkeypatch):
+    """M30.5: the provider-bound message carries the attached file's content;
+    the recorded user turn keeps the raw reference form."""
+    import core.config as cc
+    import main as app_module
+
+    uploads = cc.APP_ROOT / "data" / "uploads"
+    uploads.mkdir(parents=True, exist_ok=True)
+    (uploads / "notes.md").write_text("SECRET-CONTENT-42")
+
+    captured: dict = {}
+
+    class _CapturingRouter(_StreamRouter):
+        def route_stream(self, messages, system_prompt, profile_config, on_attempt=None):
+            captured["messages"] = messages
+            yield from super().route_stream(
+                messages, system_prompt, profile_config, on_attempt=on_attempt
+            )
+
+    monkeypatch.setattr(app_module, "_router", _CapturingRouter())
+
+    raw = "[Attached file: data/uploads/notes.md]\nsummarize this"
+    events = _post_stream(client, {"message": raw})
+    conv_id = events[-1][1]["conversation_id"]
+
+    provider_msg = captured["messages"][-1].content
+    assert "SECRET-CONTENT-42" in provider_msg          # provider sees content
+    assert "--- Attached file content:" in provider_msg
+
+    turns = app_module._history.read(conv_id)
+    assert turns[0]["content"] == raw                    # history stays raw
+    assert "SECRET-CONTENT-42" not in turns[0]["content"]

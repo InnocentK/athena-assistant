@@ -527,6 +527,22 @@ This file is the durable contract; per-release history lives in
   list produces a guaranteed-400 click (observed live with `data/uploads`).
   Keep the `is_file()` guard.
 
+## Attachment inlining (M30.5)
+
+- **Provider-bound only.** `inline_attachments()` expands
+  `[Attached file: <path>]` in the NEW message for the provider copy;
+  `record_turn`/UI/exports keep the RAW reference. Never widen inlining to
+  history or records — chat content in conversation files must be what the
+  user actually typed.
+- **The allowlist governs.** Every inline read goes through
+  `FileManager.read_file` — no parallel filesystem access path. A
+  non-allowlisted path is silently skipped (byte-identical message), never
+  an error surfaced to the provider.
+- **Best-effort by contract**: text-extension allowlist, 32 KB cap with an
+  explicit truncation marker, ≤3 files per message, any failure → unchanged
+  reference. A chat must never fail because an attachment couldn't inline.
+- Tests: `tests/test_chat_turn.py`, `tests/test_chat_stream.py`.
+
 ## File uploads (M29.3)
 
 - **The upload endpoint fully controls the target path**: basename-only

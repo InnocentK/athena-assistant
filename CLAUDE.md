@@ -308,7 +308,7 @@ post-release testing, each its own small milestone. Approved queue from the
 2026-07-17 desktop triage: **M30.4** uploads visibility + attach UX (→
 3.0.3, *shipped*); **M30.5** attachment semantics — inline small TEXT
 attachments server-side, provider-agnostic, images stay reference-only (→
-3.0.4); **M30.6** voice controls — Settings "Voice" section persisted
+3.0.4, *shipped*); **M30.6** voice controls — Settings "Voice" section persisted
 per-browser via localStorage: speak-responses toggle DEFAULT OFF, voice
 picker from system voices, transcript auto-send toggle DEFAULT OFF,
 continuous-mic mode (→ 3.0.5; deliberately builds the scaffolding M31.0

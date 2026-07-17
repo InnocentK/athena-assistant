@@ -41,6 +41,7 @@ is the source of truth for what actually shipped.
 | [M30.2-mypy-gate-fix.md](M30.2-mypy-gate-fix.md) | Green mypy gate + CalDAV ETag fix | 3.0.1 |
 | [M30.3-neutral-cwd.md](M30.3-neutral-cwd.md) | Neutral cwd for CLI provider subprocesses | 3.0.2 |
 | [M30.4-uploads-visibility.md](M30.4-uploads-visibility.md) | Uploads visibility + attach UX | 3.0.3 |
+| [M30.5-attachment-inlining.md](M30.5-attachment-inlining.md) | Attachment content inlining | 3.0.4 |
 
 ## Approved, pending implementation
 

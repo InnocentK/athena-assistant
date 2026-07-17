@@ -17,10 +17,83 @@ except for `extract_memory`.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Iterable
 
 from core.logger import logger
 from providers.base import Message
+
+# ---------------------------------------------------------------------------
+# Attachment inlining (M30.5)
+# ---------------------------------------------------------------------------
+
+# The exact whole-line form the upload UI inserts (M29.3). Anchored so prose
+# that merely mentions the phrase mid-sentence is never matched.
+_ATTACHMENT_RE = re.compile(r"^\[Attached file: (.+)\]$", re.MULTILINE)
+
+# Conservative text-only allowlist — images/binaries stay reference-only
+# until a vision path exists (CLAUDE.md Later).
+_INLINE_EXTENSIONS = {
+    "txt", "md", "markdown", "xml", "json", "yaml", "yml", "csv", "tsv",
+    "toml", "ini", "cfg", "log", "py", "js", "ts", "sh", "html", "css", "sql",
+}
+_INLINE_MAX_BYTES = 32 * 1024  # per attachment
+_INLINE_MAX_FILES = 3          # per message — bounds worst-case prompt growth
+
+
+def inline_attachments(text: str) -> str:
+    """
+    Expand ``[Attached file: <path>]`` references with the file's content
+    (M30.5) — for the PROVIDER-BOUND message only; callers record the
+    original text. Reads go through FileManager (the allowlist governs, like
+    every read). Best-effort by contract: any failure — missing file, not
+    allowlisted, non-text extension, read error — leaves that reference
+    byte-identical. Never raises.
+    """
+    if "[Attached file: " not in text:  # fast path — almost every message
+        return text
+
+    try:
+        from files.manager import FileManager  # noqa: PLC0415 — lazy, CLI-safe
+
+        fm = FileManager()
+    except Exception as exc:  # noqa: BLE001 — no manager, no inlining
+        logger.debug("inline_attachments: FileManager unavailable: %s", exc)
+        return text
+
+    inlined = 0
+
+    def _expand(match: "re.Match[str]") -> str:
+        nonlocal inlined
+        original = match.group(0)
+        path = match.group(1).strip()
+        if inlined >= _INLINE_MAX_FILES:
+            return original
+        ext = path.rsplit(".", 1)[-1].lower() if "." in path else ""
+        if ext not in _INLINE_EXTENSIONS:
+            return original
+        try:
+            result = fm.read_file(path)
+        except Exception as exc:  # noqa: BLE001 — allowlist/IO: skip, never fail
+            logger.debug("inline_attachments: skipped %s: %s", path, exc)
+            return original
+        content = str(result.get("content", ""))
+        truncated = bool(result.get("truncated"))
+        if len(content.encode("utf-8", errors="replace")) > _INLINE_MAX_BYTES:
+            content = content.encode("utf-8", errors="replace")[
+                :_INLINE_MAX_BYTES
+            ].decode("utf-8", errors="replace")
+            truncated = True
+        inlined += 1
+        marker = "\n[...truncated at 32 KB...]" if truncated else ""
+        return (
+            f"{original}\n"
+            f"--- Attached file content: {path} ---\n"
+            f"{content}{marker}\n"
+            f"--- End of attached file ---"
+        )
+
+    return _ATTACHMENT_RE.sub(_expand, text)
 
 
 def build_turn_messages(
@@ -31,11 +104,17 @@ def build_turn_messages(
     ``(role, content)`` pairs, role "user" | "assistant") followed by the new
     user message. Both surfaces MUST build their turns through this so the
     assembly (and, from M29.1, its recording) stays identical.
+
+    M30.5: attachment references in the NEW message are expanded with file
+    content for the provider-bound copy — callers record/display the
+    original text (history and exports keep the reference form). Replayed
+    history turns are deliberately NOT re-inlined (cost bound; the content
+    was in context on the turn that attached it).
     """
     messages: list[Message] = [
         Message(role=role, content=content) for role, content in history
     ]
-    messages.append(Message(role="user", content=new_message))
+    messages.append(Message(role="user", content=inline_attachments(new_message)))
     return messages
 
 
