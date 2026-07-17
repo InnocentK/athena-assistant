@@ -25,10 +25,26 @@ def test_build_turn_messages_empty_history_is_single_user_turn():
     assert len(msgs) == 1 and msgs[0].role == "user" and msgs[0].content == "solo"
 
 
-def test_system_prompt_or_none_semantics():
-    assert system_prompt_from({"system_prompt": "be brief"}) == "be brief"
-    assert system_prompt_from({"system_prompt": ""}) is None   # empty → None
-    assert system_prompt_from({}) is None
+def test_system_prompt_includes_temporal_context():
+    """M30.9: the provider-bound prompt carries the profile prompt PLUS one
+    date/time line; an empty profile prompt yields the temporal line alone
+    (providers always get at least the clock — the M29.0 empty→None semantic
+    now applies only to the profile part)."""
+    import re
+
+    line_re = re.compile(
+        r"Current date and time: \w+, \d{4}-\d{2}-\d{2} \d{2}:\d{2}"
+    )
+
+    full = system_prompt_from({"system_prompt": "be brief"})
+    assert full is not None and full.startswith("be brief\n\n")
+    assert line_re.search(full)
+
+    alone = system_prompt_from({"system_prompt": ""})
+    assert alone is not None and line_re.match(alone)
+    assert not alone.startswith("\n")
+
+    assert line_re.match(system_prompt_from({}) or "")
 
 
 def test_extract_memory_runs_and_reports():

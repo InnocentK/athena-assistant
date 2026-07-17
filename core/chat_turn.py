@@ -118,13 +118,44 @@ def build_turn_messages(
     return messages
 
 
+def _temporal_context() -> str | None:
+    """
+    One line of wall-clock context (M30.9), server-local time + timezone:
+
+        Current date and time: Friday, 2026-07-17 17:45 (CDT)
+
+    Providers are pure LLMs (M30.7) with no clock of their own; this makes
+    "what time is it in Chicago?" answerable. Guarded — a broken clock must
+    never break a chat (None → no line).
+    """
+    try:
+        from datetime import datetime  # noqa: PLC0415
+
+        now = datetime.now().astimezone()
+        tz = now.tzname() or ""
+        stamp = now.strftime("%A, %Y-%m-%d %H:%M")
+        return f"Current date and time: {stamp}" + (f" ({tz})" if tz else "")
+    except Exception:  # noqa: BLE001 — clock failure must never break a turn
+        return None
+
+
 def system_prompt_from(profile: dict[str, Any]) -> str | None:
     """
-    The system prompt exactly as both surfaces have always resolved it:
-    a present-but-empty prompt is None (``or None``), so providers never
-    receive an empty system turn.
+    The provider-bound system prompt: the profile's prompt (empty → absent,
+    the M29.0 semantic) plus, since M30.9, one line of temporal context.
+    Providers therefore now receive at least the date/time line; the return
+    is None only if the clock itself fails alongside an empty profile prompt.
+
+    NOTE (accepted): the CLI one-shot/REPL resolves this once per process,
+    so a very long REPL session's timestamp goes stale — minutes-level
+    staleness is irrelevant to the use case. The HTTP path resolves it per
+    request. System prompts are never recorded in history/exports.
     """
-    return profile.get("system_prompt") or None
+    base = profile.get("system_prompt") or None
+    temporal = _temporal_context()
+    if base and temporal:
+        return f"{base}\n\n{temporal}"
+    return base or temporal
 
 
 def record_turn(

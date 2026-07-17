@@ -323,6 +323,11 @@ This file is the durable contract; per-release history lives in
   never a guess. The test fixture pins the REAL 2.1.206 envelope; when a new
   CLI version changes the shape, update the fixture from a live capture.
   Tests: `tests/test_claude_usage.py`.
+- **Temporal context is provider-bound only and must never raise (M30.9).**
+  `system_prompt_from()` appends the server-local date/time line for
+  providers; it is never recorded (system prompts aren't part of
+  history/exports) and a clock failure silently yields no line. Keep the
+  guard; do not move the injection anywhere it could be persisted.
 - **The claude transport is pure-LLM by policy (M30.7).** `-p` mode is
   otherwise a full agent with read-only tools; `complete()` passes
   `--disallowedTools` with an explicit denylist, feature-detected via the

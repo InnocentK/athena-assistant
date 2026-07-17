@@ -45,6 +45,7 @@ is the source of truth for what actually shipped.
 | [M30.6-voice-controls.md](M30.6-voice-controls.md) | Voice output/input controls | 3.0.5 |
 | [M30.7-claude-tool-restriction.md](M30.7-claude-tool-restriction.md) | Claude transport tool restriction | 3.0.6 |
 | [M30.8-voice-settings-polish.md](M30.8-voice-settings-polish.md) | Voice settings polish (cutoff + Test) | 3.0.7 |
+| [M30.9-temporal-context.md](M30.9-temporal-context.md) | Temporal context in the system prompt | 3.0.8 |
 
 ## Approved, pending implementation
 

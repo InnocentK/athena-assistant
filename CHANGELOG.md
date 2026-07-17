@@ -4,6 +4,24 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [3.0.8] — Milestone 30.9 — Temporal context in the system prompt
+
+**App bumped to 3.0.8.** Spec: `docs/specs/M30.9-temporal-context.md`. "What
+time is it in Chicago?" was unanswerable — providers are pure LLMs (M30.7)
+and Athena injected no clock. User-approved behavior change.
+
+### Added
+- `system_prompt_from()` appends one line — `Current date and time: Friday,
+  2026-07-17 17:45 (CDT)` — server-local time + timezone, both surfaces via
+  the shared seam. Providers now always receive at least the temporal line
+  (the M29.0 empty→None semantic applies to the profile part only). Guarded:
+  a broken clock yields no line, never a broken chat. Accepted: the CLI
+  resolves the prompt once per process, so long REPL sessions carry a
+  minutes-stale stamp. ~15 tokens/turn.
+
+### Notes
+- Gate: ruff + mypy exit 0 + 615 pytest + 35 vitest.
+
 ## [3.0.7] — Milestone 30.8 — Voice settings polish
 
 **App bumped to 3.0.7.** Spec: `docs/specs/M30.8-voice-settings-polish.md`
