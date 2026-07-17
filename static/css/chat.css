@@ -671,6 +671,15 @@ body {
   resize: vertical;
 }
 
+/* M30.8: selects must SHRINK inside the flex settings-row — flex children
+   default to min-width:auto, so a long value (macOS voice names) pushed the
+   control past the panel edge instead of clipping inside it. */
+.settings-row .settings-edit-select {
+  min-width: 0;
+  flex: 0 1 auto;
+  max-width: 60%;
+}
+
 .settings-edit-select {
   background: #141414;
   color: #e0e0e0;

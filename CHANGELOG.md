@@ -4,6 +4,33 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [3.0.7] — Milestone 30.8 — Voice settings polish
+
+**App bumped to 3.0.7.** Spec: `docs/specs/M30.8-voice-settings-polish.md`
+(from the user's Pt 2 desktop findings).
+
+### Fixed
+- **Voice dropdown cut off at the panel edge** (M30.6 regression): flex
+  children default to `min-width: auto`, so macOS-length voice names pushed
+  the select past the panel instead of shrinking it. Settings-row selects now
+  shrink and cap at 60% width (the routing selects benefit on narrow widths
+  too).
+
+### Added
+- **"Test voice" button** under the picker — speaks "Hello. I'm Athena. How
+  can I help?" in the currently selected voice, immediately. Deliberately
+  ignores the speak-responses toggle: an explicit click IS the request.
+
+### Blessed (no code, user-approved)
+- The ops-files toggle showing `audit/*.py` alongside logs is **as
+  designed** — the audit package intentionally mixes source with the logs it
+  writes, the allowlist grants it read, and the view sits behind an explicit
+  toggle (INVARIANTS note). The stray `data/test.yaml`/`m6test.txt` were
+  local Milestone-6-era leftovers on the user's machine (gitignored; user
+  deletes them).
+- jsdom harness: the DOM skeleton now includes the three panel containers,
+  so panel-opening flows are testable (was: buttons only).
+
 ## [3.0.6] — Milestone 30.7 — Claude transport tool restriction
 
 **App bumped to 3.0.6.** Spec: `docs/specs/M30.7-claude-tool-restriction.md`.

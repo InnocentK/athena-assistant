@@ -50,6 +50,9 @@ const SKELETON = `
   <button id="settings-close-btn"></button>
   <button id="history-btn"></button>
   <button id="history-close-btn"></button>
+  <div id="memory-panel" class="hidden"><div id="memory-panel-body"></div></div>
+  <div id="settings-panel" class="hidden"><div id="settings-panel-body"></div></div>
+  <div id="history-panel" class="hidden"><div id="history-panel-body"></div></div>
 `;
 
 // Default fetch: satisfy the on-load /profile + /providers chain harmlessly.

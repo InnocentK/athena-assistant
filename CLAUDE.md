@@ -313,8 +313,11 @@ per-browser via localStorage: speak-responses toggle DEFAULT OFF, voice
 picker from system voices, transcript auto-send toggle DEFAULT OFF,
 continuous-mic mode (→ 3.0.5, *shipped*; the scaffolding M31.0 reuses);
 **M30.7** claude transport tool restriction — `--disallowedTools` for a
-pure-LLM chat (→ 3.0.6, *shipped*). **The desktop-triage queue is complete**;
-further 3.0.z milestones come from continued testing (mobile pass pending).
+pure-LLM chat (→ 3.0.6, *shipped*). Pt 2 queue (2026-07-17): **M30.8** voice
+settings polish — dropdown shrink fix + Test-voice button (→ 3.0.7,
+*shipped*); **M30.9** temporal context — date/time+TZ appended to the
+provider-bound system prompt (→ 3.0.8). Further 3.0.z milestones come from
+continued testing (mobile pass pending).
 
 *M31 — Voice epic (3.1.y).* Live-voice research (products, protocols,
 pricing, self-hosted pipelines) is summarized in the M31.0 spec when written;

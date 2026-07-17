@@ -557,6 +557,13 @@ This file is the durable contract; per-release history lives in
   reference. A chat must never fail because an attachment couldn't inline.
 - Tests: `tests/test_chat_turn.py`, `tests/test_chat_stream.py`.
 
+- **The ops-files toggle showing `audit/` source is BLESSED (M30.8).** The
+  audit package deliberately mixes Python source with the runtime logs it
+  writes (see its docstring); the shipped allowlist grants `audit/`
+  search+read so logs are tailable from the UI, and `.py` files ride along —
+  behind an explicit toggle, read-only, single-user. Do not "fix" this into
+  a source-file filter without a user-driven reason.
+
 ## File uploads (M29.3)
 
 - **The upload endpoint fully controls the target path**: basename-only

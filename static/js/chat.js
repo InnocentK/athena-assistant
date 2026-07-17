@@ -1421,6 +1421,20 @@ async function loadSettingsProfile() {
     });
     body.appendChild(_settingsControlRow("Voice", voiceSelect));
 
+    // M30.8: hear the selected voice immediately. Deliberately ignores the
+    // speak-responses toggle — an explicit click IS the request to hear it.
+    const testVoiceBtn = document.createElement("button");
+    testVoiceBtn.className = "settings-save-btn";
+    testVoiceBtn.textContent = "Test voice";
+    testVoiceBtn.addEventListener("click", function () {
+      if (typeof voice !== "undefined" && voice.isTTSSupported) {
+        try {
+          voice.speak("Hello. I'm Athena. How can I help?", getVoicePrefs().voiceName);
+        } catch (_) {}
+      }
+    });
+    body.appendChild(testVoiceBtn);
+
     body.appendChild(_voiceToggleRow("Auto-send voice transcript", "autoSend", vp.autoSend));
     body.appendChild(_voiceToggleRow("Keep listening until stopped", "continuous", vp.continuous));
     const voiceNote = document.createElement("div");

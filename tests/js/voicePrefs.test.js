@@ -171,3 +171,28 @@ describe("M30.6 — continuous mic mode", () => {
     expect(got).toEqual(["quick note"]);
   });
 });
+
+describe("M30.8 — voice test button", () => {
+  test("Test voice speaks the sample phrase even with speak-responses OFF", async () => {
+    const speakSpy = installSpeechFakes();
+    window.localStorage.setItem(PREFS_KEY, JSON.stringify({ speak: false, voiceName: "TestVoice" }));
+    const { chat } = await bootChat(chatFetch());
+
+    // Open the settings Profile tab so the Voice section renders.
+    document.getElementById("settings-btn").click();
+    await tick();
+    await tick();
+    await tick();
+    await tick();
+
+    const buttons = Array.from(document.querySelectorAll("#settings-panel-body button"));
+    const testBtn = buttons.find((b) => b.textContent === "Test voice");
+    expect(testBtn).toBeTruthy();
+
+    testBtn.click();
+    expect(speakSpy).toHaveBeenCalledTimes(1);
+    const utterance = speakSpy.mock.calls[0][0];
+    expect(utterance.text).toBe("Hello. I'm Athena. How can I help?");
+    expect(utterance.voice && utterance.voice.name).toBe("TestVoice");
+  });
+});
