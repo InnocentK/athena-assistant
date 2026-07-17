@@ -3,18 +3,27 @@
 Common issues and fixes. See also [INSTALLATION.md](INSTALLATION.md) and
 [CONFIGURATION.md](CONFIGURATION.md).
 
-## CLI: `failed to load Athena modules: No module named 'diagnostics'`
+## CLI: `failed to load Athena modules: No module named '<package>'`
 
-Cause: an editable install (`pip install -e .`) that doesn't expose all of
-Athena's top-level packages — an outdated `[tool.setuptools] packages` list in
-`pyproject.toml` (this exact error meant `diagnostics`/`saved` were missing).
+The `athena` command comes from an editable install (`pip install -e .`),
+whose package mapping is a **snapshot from install time**. Two causes, most
+common first:
 
-Fix: ensure every runtime package is declared in `pyproject.toml` under
-`[tool.setuptools] packages`, then reinstall:
+1. **Your venv's install is stale or missing** (the usual case — observed in
+   the wild right after 3.0.0 shipped). Installing `requirements.txt` alone
+   does NOT install Athena itself, and an editable install made before a
+   milestone that *added* a top-level package doesn't know about the new one.
+   Fix — refresh the install:
 
-```bash
-pip install -e .
-```
+   ```bash
+   task install        # deps + editable install (M30.1), or manually:
+   pip install -e .
+   ```
+
+2. **A stale package list in the repo** (maintainer error): every runtime
+   package must be declared in `pyproject.toml` under
+   `[tool.setuptools] packages` (the M26.4 invariant — this error on a FRESH
+   `pip install -e .` means the list is missing one).
 
 If you're working from a checkout, the no-install path `python -m cli "..."`
 always works (it runs from the project directory and doesn't depend on

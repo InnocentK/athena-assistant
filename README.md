@@ -21,8 +21,9 @@ diagnostics, and editable settings.
 git clone <your-repo-url> athena-assistant && cd athena-assistant
 python3 -m venv .venv && source .venv/bin/activate
 
-# 2. Dependencies
+# 2. Dependencies + the athena CLI command
 pip install -r requirements.txt
+pip install -e .
 
 # 3. Environment (set APP_ENV and ACTIVE_PROFILE at minimum)
 cp .env.example .env
@@ -30,6 +31,11 @@ cp .env.example .env
 # 4. Run the web app at http://localhost:8000
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+With the optional [Task](https://taskfile.dev) runner, steps 1–3 after the
+clone are just `task setup`; after pulling updates, `task update` brings the
+environment current (deps + `athena` command + frontend dev deps). See
+[docs/TASKFILE.md](docs/TASKFILE.md).
 
 Full setup (Docker, profiles, validation) is in
 [docs/INSTALLATION.md](docs/INSTALLATION.md).

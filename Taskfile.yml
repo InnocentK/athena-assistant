@@ -3,7 +3,10 @@
 #
 # Usage:
 #   task --list          # show all available tasks
-#   task install         # install Python dependencies
+#   task setup           # first-time setup (venv + deps + athena command + .env)
+#   task install         # make the venv current (deps + athena command)
+#   task update          # after pulling changes: install + npm deps + show version
+#   task doctor          # athena preflight checks (M28.6)
 #   task run             # start local dev server
 #   task up              # start Docker stack
 #
@@ -33,23 +36,50 @@ tasks:
   # ---------------------------------------------------------------------------
 
   setup:
-    desc: "First-time project setup: create venv, install deps, copy .env.example"
+    desc: "First-time project setup: venv, deps, the athena command (editable), .env"
     cmds:
       - python3 -m venv {{.VENV}}
       - "{{.PIP}} install --quiet -r requirements.txt"
+      # M30.1: the editable install is what provides the `athena` command and
+      # maps Athena's own packages — without it, `athena` doesn't exist.
+      - "{{.PIP}} install --quiet -e ."
       - cmd: |
           if [ ! -f .env ]; then
             cp .env.example .env
             echo "Notice: .env created from .env.example — edit it before running."
           fi
       - mkdir -p logs audit data/carddav_staged data/import_conflicts
-      - 'echo "Setup complete. Activate with: source .venv/bin/activate"'
+      - 'echo "Setup complete. Activate with: source .venv/bin/activate  (the athena command is installed in the venv)"'
     platforms: [linux, darwin]
 
   install:
-    desc: "Install / update Python dependencies into the active venv"
+    desc: "Make the venv current: deps AND the athena command (editable) — run after pulling changes"
     cmds:
       - "{{.PIP}} install --quiet -r requirements.txt"
+      # M30.1: re-running `-e .` is REQUIRED after a milestone adds a top-level
+      # package — an editable install's package mapping is a snapshot from
+      # install time ("No module named '<pkg>'" from athena means: run this).
+      - "{{.PIP}} install --quiet -e ."
+
+  update:
+    desc: "After pulling new commits: task install + frontend dev deps (if npm present) + show the installed version"
+    cmds:
+      - task: install
+      - cmd: |
+          if command -v npm >/dev/null 2>&1; then
+            npm install --silent && echo "frontend dev deps: OK (npm install)"
+          else
+            echo "frontend dev deps: npm not found — skipped (Python-only development is fine; Node is only needed for 'task test:js')"
+          fi
+      - cmd: |
+          {{.PYTHON}} -c 'from core.version import __version__; print("Athena", __version__, "- environment is current.")'
+    platforms: [linux, darwin]
+
+  doctor:
+    desc: "Run the athena preflight checks (config/filesystem only, no network — M28.6; exits 1 if a check fails)"
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - "{{.PYTHON}} -m cli --doctor"
 
   # ---------------------------------------------------------------------------
   # Lint (M26.19) — ruff correctness gate; config in pyproject.toml [tool.ruff]

@@ -37,6 +37,7 @@ is the source of truth for what actually shipped.
 | [M29.8-review-remediation.md](M29.8-review-remediation.md) | Review remediation (8 findings) | 2.9.8 |
 | [M29.9-remediation-review.md](M29.9-remediation-review.md) | Remediation diff-review (addendum) | no bump |
 | [M30-streaming.md](M30-streaming.md) | Streaming (SSE) — the major release | **3.0.0** |
+| [M30.1-taskfile-dx.md](M30.1-taskfile-dx.md) | Taskfile DX (install/update/doctor) | no bump |
 
 ## Approved, pending implementation
 

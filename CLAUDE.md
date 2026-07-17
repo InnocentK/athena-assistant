@@ -279,6 +279,15 @@ still applies):**
 **Athena 3.0.0 — the roadmap target — is shipped.** Post-3.0 work starts
 from the "Later / unscheduled" list below (spec first, as always).
 
+*Post-3.0 milestones:*
+
+- **M30.1 — Taskfile DX** (no bump) — *shipped.* `task setup`/`task install`
+  now run the editable self-install (the `athena` command + package mapping);
+  new `task update` (post-pull one-shot) and `task doctor`; TASKFILE.md
+  backfilled (M26.19–26.26 tasks were undocumented); TROUBLESHOOTING documents
+  the stale-editable-install failure observed live after 3.0.0.
+  → `docs/specs/M30.1-taskfile-dx.md`
+
 **Later / unscheduled:** Ollama phase 2 (multi-model, embeddings, tools);
 generic OpenAI-compatible local-provider abstraction; saved-items surfacing
 (`athena saved …`) + non-file saved-search targets; relevance-based memory

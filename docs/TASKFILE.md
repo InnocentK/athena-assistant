@@ -29,8 +29,33 @@ task --list-all      # including internal/hidden tasks
 
 | Task | Description |
 |------|-------------|
-| `task setup` | First-time setup: create venv, install deps, copy `.env.example` |
-| `task install` | Install / update Python dependencies (venv must be active) |
+| `task setup` | First-time setup: venv, deps, the `athena` command (editable install), `.env` from the example |
+| `task install` | Make the venv current: deps **and** the `athena` command — run after pulling changes (M30.1) |
+| `task update` | Post-pull one-shot: `install` + `npm install` when npm is present (skipped with a notice otherwise) + prints the installed version (M30.1) |
+| `task doctor` | Athena preflight checks — config/filesystem only, no network (M28.6); exits 1 if a check fails |
+
+Why `install` runs `pip install -e .`: the editable install is what provides
+the `athena` console command AND the mapping of Athena's own packages, and
+that mapping is a snapshot from install time. A venv installed before a
+milestone that added a top-level package fails with
+`No module named '<pkg>'` until it is re-run — `task install` makes that
+impossible to forget (see TROUBLESHOOTING.md, which documents the real
+incident).
+
+### Quality gates (M26.19–M26.26)
+
+| Task | Description |
+|------|-------------|
+| `task lint` | Ruff lint check (correctness gate; config in `pyproject.toml [tool.ruff]`) |
+| `task lint:fix` | Auto-fix the safely fixable ruff violations |
+| `task typecheck` | mypy (lenient type gate; config in `pyproject.toml [tool.mypy]`) |
+| `task audit` | pip-audit over the pinned requirements (known-CVE scan) |
+| `task coverage` | Suite with coverage + missing-line report (floor in `pyproject [tool.coverage]`) |
+| `task coverage:html` | Coverage as a browsable HTML report in `htmlcov/` |
+| `task hooks:install` | Install the git pre-commit hooks (once per clone) |
+| `task hooks:run` | Run all pre-commit hooks against every file |
+| `task ci` | The full CI gate locally: lint + typecheck + audit + editable install + suite w/ coverage |
+| `task test:js` | Frontend (jsdom) tests for `static/js/*` — needs Node (`npm install` first) |
 
 ### Local development
 
@@ -39,7 +64,6 @@ task --list-all      # including internal/hidden tasks
 | `task run` | Start dev server with auto-reload on port 8000 |
 | `task run PORT=9000` | Start dev server on a custom port |
 | `task run:prod` | Start server without auto-reload, single worker |
-| `task health` | Curl `/health` and pretty-print the response |
 
 ### Docker
 
@@ -59,6 +83,16 @@ task --list-all      # including internal/hidden tasks
 | `task test:file FILE=tests/test_foo.py` | Run a single test file |
 | `task test:clean` | Remove `.pytest_cache`, `.coverage`, `htmlcov` |
 
+### Operations (requires a running server)
+
+| Task | Description |
+|------|-------------|
+| `task health` | Curl `/health` and pretty-print the response |
+| `task backup` | Create a backup export via the API |
+| `task backup:list` | List available backup exports |
+| `task restore:diff ZIP=<filename>` | Dry-run diff for a backup zip |
+| `task ops:audit` | Tail today's ops audit log |
+
 ### Cleanup
 
 | Task | Description |
@@ -75,7 +109,7 @@ Taskfile **orchestrates** existing commands — it does not replace anything:
 | `docker-compose.yml` | Defines the full container stack; `task up/down/build/logs` wrap it |
 | `Dockerfile` | Unchanged; Taskfile does not modify the image build |
 | `pytest` | Test runner; `task test:*` are convenience wrappers |
-| `requirements.txt` | Dependency list; `task install` installs from it |
+| `requirements.txt` | Dependency list; `task install` installs from it (plus the editable self-install) |
 
 ## File structure
 
@@ -90,6 +124,6 @@ The root Taskfile includes `tests/Taskfile.yml` under the `test:` namespace. All
 
 ## Notes
 
-- `task setup` and `task clean` use shell commands and are Linux/macOS only. On Windows, use `run.bat` for setup and delete artifacts manually.
+- `task setup`, `task update`, and `task clean` use shell commands and are Linux/macOS only. On Windows, use `run.bat` for setup (then `pip install -e .` manually) and delete artifacts manually.
 - The `PORT` variable can be overridden: `task run PORT=9000`.
 - `task test:file` requires the `FILE` variable: `task test:file FILE=tests/test_config.py`.

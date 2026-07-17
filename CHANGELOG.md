@@ -4,6 +4,22 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [Unreleased] — Milestone 30.1 — Taskfile developer experience
+
+Tooling/docs only — **no code change; the app stays 3.0.0**. Spec:
+`docs/specs/M30.1-taskfile-dx.md`. Closes the gap behind a real post-3.0
+incident (`athena` failing with `No module named 'diagnostics'` in a venv
+whose editable install was missing): `task setup` and `task install` now run
+`pip install -e .` (the step that provides the `athena` command and maps
+Athena's packages — previously only buried inside `task ci`); new
+`task update` (post-pull one-shot: install + guarded `npm install` + prints
+the installed version) and `task doctor` (surfaces the M28.6 preflight).
+`docs/TASKFILE.md` also backfills the never-documented M26.19–M26.26
+quality-gate and operations tasks; README quick start now produces a working
+`athena`; TROUBLESHOOTING's `No module named` entry documents the real cause
+(stale editable snapshot) and the `task install` remedy. Deliberately not
+added: a `task cli` passthrough.
+
 ## [3.0.0] — Milestone 30 — Streaming
 
 **Major release.** Spec: `docs/specs/M30-streaming.md`. Responses render as
