@@ -274,3 +274,19 @@ def test_vcard_multi_value_roundtrip():
     )
     assert "jane@work.com" in out and "jane@home.com" in out
     assert "+15550001" in out and "+15550002" in out
+
+
+# ---------------------------------------------------------------------------
+# M30.2 — the ETag fetch's import path is pinned to the installed caldav
+# ---------------------------------------------------------------------------
+
+
+def test_getetag_import_path_exists_on_pinned_caldav():
+    """M30.2: `caldav.dav` does not exist in caldav 3.x — the old
+    `caldav.dav.GetEtag()` raised AttributeError into the etag guard on every
+    call, silently recording etags as "". The fix imports GetEtag from its
+    real home; a future caldav bump that moves it must fail HERE, loudly,
+    instead of silently re-breaking etag recording."""
+    from caldav.elements.dav import GetEtag
+
+    assert callable(GetEtag)

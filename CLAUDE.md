@@ -287,6 +287,13 @@ from the "Later / unscheduled" list below (spec first, as always).
   backfilled (M26.19–26.26 tasks were undocumented); TROUBLESHOOTING documents
   the stale-editable-install failure observed live after 3.0.0.
   → `docs/specs/M30.1-taskfile-dx.md`
+- **M30.2 — green mypy gate + CalDAV ETag fix** (→ 3.0.1) — *shipped.*
+  `mypy .` had exited 1 for several milestones (pipe-masked; erratum in
+  REVIEW-3.0). 7 precise ignores for caldav's `__getattr__ -> object`
+  lazy-loader artifact (load-bearing — see INVARIANTS) + 1 REAL fix mypy was
+  pointing at: `caldav.dav` doesn't exist in caldav 3.x, so etags silently
+  recorded as `""`; GetEtag now imports from `caldav.elements.dav`
+  (regression-pinned). → `docs/specs/M30.2-mypy-gate-fix.md`
 
 **Later / unscheduled:** Ollama phase 2 (multi-model, embeddings, tools);
 generic OpenAI-compatible local-provider abstraction; saved-items surfacing

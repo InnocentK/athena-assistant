@@ -316,7 +316,7 @@ def import_ics(
     import caldav as caldav_lib
 
     try:
-        cal_obj = caldav_lib.Calendar(client=caldav_client._client, url=calendar_url)
+        cal_obj = caldav_lib.Calendar(client=caldav_client._client, url=calendar_url)  # type: ignore[operator] # caldav lazy-attr (M30.2)
     except Exception as exc:
         summary.errors.append(f"Could not create caldav.Calendar object: {exc!s}")
         cal_obj = None

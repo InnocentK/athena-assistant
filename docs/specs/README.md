@@ -38,6 +38,7 @@ is the source of truth for what actually shipped.
 | [M29.9-remediation-review.md](M29.9-remediation-review.md) | Remediation diff-review (addendum) | no bump |
 | [M30-streaming.md](M30-streaming.md) | Streaming (SSE) — the major release | **3.0.0** |
 | [M30.1-taskfile-dx.md](M30.1-taskfile-dx.md) | Taskfile DX (install/update/doctor) | no bump |
+| [M30.2-mypy-gate-fix.md](M30.2-mypy-gate-fix.md) | Green mypy gate + CalDAV ETag fix | 3.0.1 |
 
 ## Approved, pending implementation
 

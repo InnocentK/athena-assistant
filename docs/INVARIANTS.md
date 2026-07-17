@@ -95,6 +95,22 @@ This file is the durable contract; per-release history lives in
 - Prefer **real narrowing** (assert / precise types / annotations) over
   `# type: ignore`; if an ignore is unavoidable, make it specific
   (`# type: ignore[code]`) and comment why.
+- **The gate is `mypy .`'s EXIT CODE — never assess it through a shell pipe
+  (M30.2).** `mypy . | tail` reports the pipe's status, not mypy's; that
+  masking let a red gate be logged as "clean" across several milestones
+  (erratum in `docs/history/REVIEW-3.0-2026-07.md`). Verify with
+  `mypy . ; echo $?` (or `task typecheck`, unpiped).
+- **The caldav `# type: ignore[operator]` lines are load-bearing (M30.2).**
+  caldav 3.x ships `py.typed` with a PEP 562 lazy loader typed
+  `__getattr__(name) -> object`, so `caldav.X` module attrs type as `object`.
+  Do NOT "fix" the ignores by switching to real-submodule imports
+  (`caldav.davclient`/`caldav.collection`): the DAV test fakes mock at the
+  `caldav` module boundary (`sys.modules["caldav"]`, `patch("caldav.X")`) and
+  real-submodule imports silently bypass every fake. The ONE real-submodule
+  import is deliberate: `from caldav.elements.dav import GetEtag` fixes a
+  live bug (`caldav.dav` doesn't exist in caldav 3.x — etags silently
+  recorded as `""`); its path is regression-pinned in
+  `tests/test_dav_correctness.py`.
 - Invariant tie-in: `providers/router.py`'s diagnostics `trace` is `None` when
   diagnostics are disabled, and a per-attempt `rec` is created **iff** `trace`
   exists — the `assert trace is not None` before each `trace.add(rec)` encodes

@@ -311,3 +311,20 @@ Gate at addendum time (pre-bump, 2.9.8): ruff clean; mypy at the 8-error
 pre-existing caldav/ics-stub baseline (M26.21); **593 pytest** green,
 coverage 77% (floor 74); **28 vitest** green.
 **Verdict: M30's diff is fit to become 3.0.0.**
+
+
+## Erratum — gate lines overstated mypy (found M30.2, 2026-07-16)
+
+Several gate statements in this report and in milestone logs ("ruff + mypy
+clean") were verified through a shell pipe (`mypy . | tail …`), which reports
+the PIPE's exit status, not mypy's. In any environment with the pinned caldav
+3.x actually installed, `mypy .` exited 1 throughout with 8
+`"object" not callable`-family errors (caldav's py.typed PEP 562 lazy loader
+types module attrs as `object`). The test/lint/coverage figures in those gate
+lines are unaffected (verified by their own exit codes); only the mypy claims
+were wrong. Fixed in M30.2 (→ 3.0.1): 7 precise per-line ignores + 1 REAL bug
+fix the type errors were pointing at (`caldav.dav` does not exist in caldav
+3.x — the ETag fetch had silently recorded `""` since the caldav 3 pin), plus
+an INVARIANTS rule: the type gate is `mypy .`'s exit code, never assessed
+through a pipe. Post-fix: `mypy .` exits 0 — "no issues found in 69 source
+files".

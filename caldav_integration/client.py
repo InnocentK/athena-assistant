@@ -74,7 +74,12 @@ class CalDAVClient:
         try:
             import caldav  # noqa: PLC0415
 
-            client = caldav.DAVClient(
+            # caldav ships py.typed with a PEP 562 lazy loader typed
+            # `__getattr__(name) -> object`, so module attrs type as `object`
+            # under mypy — suppressed per-line, never fixed by switching to
+            # real-submodule imports (the test fakes mock at the `caldav`
+            # module boundary; see docs/specs/M30.2-mypy-gate-fix.md).
+            client = caldav.DAVClient(  # type: ignore[operator]
                 url=self._url,
                 username=self._username,
                 password=self._password,
@@ -189,7 +194,7 @@ class CalDAVClient:
             self._ensure_connected()
             import caldav  # noqa: PLC0415
 
-            cal = caldav.Calendar(client=self._client, url=calendar_url)
+            cal = caldav.Calendar(client=self._client, url=calendar_url)  # type: ignore[operator] # caldav lazy-attr (M30.2)
             now = datetime.now(tz=timezone.utc)
             end = now + timedelta(days=days_ahead)
             events = cal.date_search(start=now, end=end, expand=True)
@@ -225,9 +230,15 @@ class CalDAVClient:
             # Try to get ETag for the calendar
             etag = ""
             try:
+                # M30.2: `caldav.dav` does NOT exist in caldav 3.x — the old
+                # `caldav_lib.dav.GetEtag()` raised AttributeError into this
+                # guard on every call, so etags silently recorded as "".
+                # GetEtag's real home on the pinned caldav==3.2.1 (the import
+                # path is regression-pinned in tests/test_dav_correctness.py):
+                from caldav.elements.dav import GetEtag  # noqa: PLC0415
                 import caldav as caldav_lib  # noqa: PLC0415
-                cal_obj = caldav_lib.Calendar(client=self._client, url=calendar_url)
-                props = cal_obj.get_properties([caldav_lib.dav.GetEtag()])
+                cal_obj = caldav_lib.Calendar(client=self._client, url=calendar_url)  # type: ignore[operator] # caldav lazy-attr (M30.2)
+                props = cal_obj.get_properties([GetEtag()])
                 etag = str(props.get("{DAV:}getetag", ""))
             except Exception:  # noqa: BLE001
                 etag = ""
@@ -256,7 +267,7 @@ class CalDAVClient:
             self._ensure_connected()
             import caldav  # noqa: PLC0415
 
-            cal = caldav.Calendar(client=self._client, url=calendar_url)
+            cal = caldav.Calendar(client=self._client, url=calendar_url)  # type: ignore[operator] # caldav lazy-attr (M30.2)
             todos = cal.todos()
 
             result = []
@@ -351,7 +362,7 @@ class CalDAVClient:
 
             ical_data = "\r\n".join(lines) + "\r\n"
 
-            cal = caldav.Calendar(client=self._client, url=calendar_url)
+            cal = caldav.Calendar(client=self._client, url=calendar_url)  # type: ignore[operator] # caldav lazy-attr (M30.2)
             cal.save_todo(ical_data)
 
             return {

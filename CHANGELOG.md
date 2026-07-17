@@ -4,6 +4,33 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [3.0.1] — Milestone 30.2 — Green mypy gate + CalDAV ETag fix
+
+**App bumped to 3.0.1.** Spec: `docs/specs/M30.2-mypy-gate-fix.md`. Found via
+the M30.1 incident's claude-in-repo session flagging "type-check issues":
+`mypy .` exited 1 on a fresh checkout (8 errors; `task ci`'s typecheck step
+was red), and the gate had been mis-assessed through a shell pipe for several
+milestones (erratum in `docs/history/REVIEW-3.0-2026-07.md`).
+
+### Fixed
+- **CalDAV ETag recording** — `caldav.dav` does not exist in caldav 3.x, so
+  the ETag fetch (`caldav.dav.GetEtag()`) raised AttributeError into its
+  guard on EVERY call and `dav_status` etags silently recorded as `""` since
+  the caldav 3 pin. mypy's `attr-defined` error was pointing at this real
+  bug. Now imports `GetEtag` from its true home (`caldav.elements.dav`);
+  the import path is regression-pinned so a future caldav bump fails loudly.
+- **The 7 remaining errors** are caldav's py.typed PEP 562 lazy loader typing
+  module attrs as `object` — suppressed with precise per-line
+  `# type: ignore[operator]` comments. Deliberately NOT "fixed" via
+  real-submodule imports: the DAV test fakes mock at the `caldav` module
+  boundary and would be silently bypassed (INVARIANTS now records this).
+- **INVARIANTS**: the type gate is `mypy .`'s EXIT CODE — never assess it
+  through a pipe.
+
+### Notes
+- Gate: `mypy .` exits 0 ("no issues found in 69 source files") — plus ruff,
+  **594 pytest**, 28 vitest.
+
 ## [Unreleased] — Milestone 30.1 — Taskfile developer experience
 
 Tooling/docs only — **no code change; the app stays 3.0.0**. Spec:

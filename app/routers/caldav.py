@@ -298,7 +298,7 @@ async def caldav_resolve_conflict(
 
         def _push_event() -> None:
             client._ensure_connected()
-            cal_obj = caldav_lib.Calendar(client=client._client, url=calendar_url)
+            cal_obj = caldav_lib.Calendar(client=client._client, url=calendar_url)  # type: ignore[operator] # caldav lazy-attr (M30.2)
             cal_obj.add_event(raw_ical)
 
         try:
