@@ -4,6 +4,49 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [3.1.0] — Milestone 31.0 — Conversation mode (the Voice epic opens)
+
+**App bumped to 3.1.0** (minor — epic opener). Spec:
+`docs/specs/M31.0-conversation-mode.md` (implemented under the 2026-07-17
+overnight pre-approval, amendments A1–A4 in the spec). The cheap probe of the
+M31 Voice direction: a live-feeling voice loop from what already exists — M5
+Web Speech, M30 streaming, M30.6 voice prefs. Browser-only; no backend
+change, no new dependency, no per-minute cost.
+
+### Added
+- **Streaming speech** — with the new Voice-section toggle **"Conversation
+  mode"** ON (default OFF, browser-local like its M30.6 siblings), the
+  streaming path speaks each completed sentence as chunks assemble it.
+  Deliberately-dumb splitter: `.` `!` `?` followed by whitespace, 12-char
+  minimum so "e.g." never fires, tail flushed at done. `voice.js` gains
+  `enqueue(text, voiceName)` — `speak()` without the leading cancel — and
+  `speak()` now returns its utterance (A4). The done-event's authoritative-
+  text reconcile stays visual-only: reconciled text is never re-spoken.
+- **Hands-free loop** — armed by a mic click while the toggle is on (never
+  without a user gesture); when the reply's last utterance ends, the mic
+  re-opens automatically. Stops on: mic-off click, typed send, STT error,
+  hidden tab, or unchecking the toggle. Green ring on the mic button while
+  the loop is live. Failed/empty turns re-open the mic immediately (A3) —
+  "try again" is the conversational recovery.
+- **Barge-in** — speech synthesis cancels the moment the mic re-opens (in
+  that order — the mic never listens while Athena speaks), on transcript
+  delivery, and on any new send. Speech is a VIEW of the answer: cancelling
+  it never suppresses or alters the rendered text.
+- Conversation mode implies speak-responses and transcript auto-send for the
+  session (A1) without rewriting those stored prefs.
+
+### Notes
+- Honest limits (PLATFORMS): STT is Chromium/Safari; CLI-transport providers
+  deliver one utterance after the wait (the live feel needs an API-transport
+  provider); mic needs a secure context (HTTPS/Tailscale); markdown is
+  spoken as-is; speaker echo is physically possible — headphones recommended.
+- The M30.6 `.speak &&` count pin evolved consciously (A2, REVIEW-3.0.z B5)
+  into `_shouldSpeak(` counting; OFF-path behavior is pinned by the untouched
+  M30.6 suites.
+- Whether M31.1+ (Athena Live, the self-hosted pipeline) happens is decided
+  by living with this probe, not speculation.
+- Gate: ruff + mypy exit 0 + 619 pytest + 52 vitest (17 new).
+
 ## [Unreleased] — Milestone 30.10 — Scoped review of the 3.0.z wave
 
 Docs only — **no code change; the app stays 3.0.8**. Spec:

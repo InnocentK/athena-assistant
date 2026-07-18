@@ -108,12 +108,18 @@ def test_voice_prefs_scaffolding_present():
     assert '_VOICE_PREFS_KEY = "athena-voice-prefs"' in _CHAT_JS
     assert "speak: false" in _CHAT_JS       # read-aloud is opt-in
     assert "autoSend: false" in _CHAT_JS    # transcript review is the default
-    # both TTS call sites are pref-gated (never unconditional again)
-    assert _CHAT_JS.count(".speak &&") == 2
+    # M31.0 (A2) evolved the M30.6 `.speak &&` count pin, per REVIEW-3.0.z B5
+    # ("extend the pin consciously, never delete it"): both whole-reply TTS
+    # call sites now gate through the ONE shared helper — definition + the
+    # streaming done-path + the buffered path. A fourth `_shouldSpeak(` means
+    # a new speech site was added without thinking about conversation mode.
+    assert _CHAT_JS.count("_shouldSpeak(") == 3
+    assert ".speak &&" not in _CHAT_JS      # no stray direct gates remain
 
 
 def test_voice_settings_section_rendered():
     assert '_settingsSectionTitle("Voice")' in _CHAT_JS
+    assert '"Conversation mode"' in _CHAT_JS       # M31.0
     assert '"Speak responses aloud"' in _CHAT_JS
     assert '"Auto-send voice transcript"' in _CHAT_JS
     assert '"Keep listening until stopped"' in _CHAT_JS
@@ -123,3 +129,44 @@ def test_voice_js_supports_continuous_and_voice_picker():
     assert "this.continuous" in _VOICE_JS
     assert "listVoices()" in _VOICE_JS
     assert "voiceschanged" in _CHAT_JS  # async voice loading handled
+
+
+# --- M31.0: conversation mode — structure pins --------------------------------
+
+def test_conversation_mode_default_off_and_gated():
+    # The pref exists, defaults OFF, and the streaming sentence path is gated
+    # on `conversation` (not on `speak`) — A2's second assertion.
+    assert "conversation: false" in _CHAT_JS
+    assert "if (!vp.conversation) return null" in _CHAT_JS  # _beginConvoTurn gate
+
+
+def test_enqueue_never_cancels():
+    # voice.js: enqueue() (and the shared _makeUtterance below it) must never
+    # cancel — cancelling would clip the sentence currently being spoken.
+    # speak() keeps its cancel-then-say contract for Test-voice / whole-reply.
+    # Anchors are the two DEFINITION lines (`… {`), which are unique — doc
+    # comments mention these names earlier and would corrupt looser slices.
+    start = _VOICE_JS.index("enqueue(text, voiceName) {")
+    end = _VOICE_JS.index("_makeUtterance(text, voiceName) {")
+    segment = _VOICE_JS[start:end]
+    assert "_makeUtterance" in segment  # enqueue delegates to the shared builder
+    assert "cancel" not in segment
+    # A4: speak() hands back its utterance so callers can watch `onend`.
+    assert "return utterance" in _VOICE_JS
+
+
+def test_done_path_tail_is_streamed_text_not_reconciled():
+    # The done-event's authoritative-text reconcile stays visual-only: the
+    # spoken tail always derives from the ASSEMBLED streamed text.
+    assert "assembled.slice(convo.spokenUpTo)" in _CHAT_JS
+
+
+def test_hands_free_loop_requires_gesture_and_stops_everywhere():
+    # The loop arms ONLY inside the mic-click handler (browser gesture
+    # policies): definition + exactly one call site. A second arm site means
+    # auto-listen could start without a user gesture — rethink before bumping.
+    assert _CHAT_JS.count("_convoArm()") == 2
+    # Every stop condition is wired (definition + five disarm sites: mic-off
+    # click, STT error, hidden tab, typed send, settings toggle-off).
+    assert _CHAT_JS.count("_convoDisarm()") == 6
+    assert "visibilitychange" in _CHAT_JS

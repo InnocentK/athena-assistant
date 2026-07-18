@@ -117,6 +117,19 @@ turn (M26.10); `done.response` is authoritative when chunks drift. The
 pre-M30 send tests keep exercising the buffered path by having their fetch
 mock report `/chat/stream` unavailable.
 
+`conversationMode.test.js` (M31.0, 17 tests) covers conversation mode with
+fake speech APIs + SSE streams: the sentence splitter (terminator+whitespace
+boundaries, never end-of-buffer, the 12-char abbreviation guard, decimals,
+ordering); `_shouldSpeak` (conversation implies speaking); streamed chunks
+enqueue completed sentences in order with the tail flushed at done and the
+authoritative-text reconcile never spoken (visual-only); the OFF+`speak:true`
+whole-reply path unchanged; and the hands-free loop — a mic click arms it
+(visual state), transcripts auto-send with barge-in cancel (A1), the mic
+re-opens after the LAST utterance's `onend`, typed sends / STT errors /
+hidden tabs / unchecking the toggle all stop it, and a failed turn re-opens
+the mic immediately (A3). The M30.6 `voicePrefs` suite runs untouched — its
+passing IS the off-path pin.
+
 ## What is intentionally not covered yet
 
 - Live CalDAV / CardDAV / Nextcloud network calls (all mocked)

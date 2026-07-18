@@ -320,23 +320,29 @@ provider-bound system prompt (→ 3.0.8, *shipped*). **Both triage queues are
 complete**, the mobile pass is done (M28.4 layout verified live; PWA needs
 the documented HTTPS step — no code), and **M30.10** (no bump) ran the
 cadence-rule scoped review of the whole wave: FIX none / DEFER none / BLESS
-five (`docs/history/REVIEW-3.0.z-2026-07.md`). **3.1 is clear to start** —
-M31.0's spec is written and awaiting the user's personal review.
+five (`docs/history/REVIEW-3.0.z-2026-07.md`).
 
 *M31 — Voice epic (3.1.y).* Live-voice research (products, protocols,
-pricing, self-hosted pipelines) is summarized in the M31.0 spec when written;
-the decision record is this entry.
+pricing, self-hosted pipelines) is summarized in this entry + the M31.0
+spec; the decision record is this entry.
 
-- **M31.0 — Conversation mode** (→ 3.1.0, the epic opener): browser-only
-  upgrade of the M5 voice + M30 streaming — sentence-by-sentence TTS as SSE
-  chunks arrive (stop waiting for `done`), a hands-free listen loop
-  (auto-restart recognition when playback ends), and barge-in
-  (`speechSynthesis.cancel()` when recognition hears the user). No backend
-  change, no new deps, no per-minute cost. KNOWN LIMITS to state honestly:
-  Web Speech STT is Chromium/Safari (not Firefox); CLI-transport providers
-  answer whole (voice waits — same honest degrade as M30 text streaming);
-  the mic needs a secure context (HTTPS over Tailscale — REMOTE-ACCESS.md).
-  M31.0 is deliberately the CHEAP PROBE: live with it before building more.
+- **M31.0 — Conversation mode** (→ **3.1.0, SHIPPED** under the 2026-07-17
+  overnight pre-approval; spec + amendments A1–A4 in
+  `docs/specs/M31.0-conversation-mode.md`): browser-only upgrade of the M5
+  voice + M30 streaming — sentence-by-sentence TTS as SSE chunks arrive
+  (`voice.enqueue()`, dumb splitter, tail at done, reconcile never spoken),
+  a hands-free listen loop (armed ONLY by a mic click; auto-restarts
+  recognition when the last utterance ends; stops on mic-off/typed
+  send/STT error/hidden tab/toggle-off), and barge-in (synthesis cancels
+  before the mic opens, on transcript, on send — speech is a VIEW of the
+  answer, never the answer). Settings toggle default OFF; implies
+  speak+auto-send for the session. No backend change, no new deps, no
+  per-minute cost. KNOWN LIMITS stated in PLATFORMS.md: Web Speech STT is
+  Chromium/Safari (not Firefox); CLI-transport providers answer whole
+  (voice waits — same honest degrade as M30 text streaming); the mic needs
+  a secure context (HTTPS over Tailscale — REMOTE-ACCESS.md); <600px
+  layouts hide the mic (desktop-first). M31.0 is deliberately the CHEAP
+  PROBE — **the probe is now running: live with it before building more.**
 - **M31.1+ — Athena Live (self-hosted cascaded voice)** — only if the M31.0
   probe earns it; staged mini-milestones, spec'd separately: (a) local Piper/
   Kokoro TTS endpoint (better voices than SpeechSynthesis, standalone win);

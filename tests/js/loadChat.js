@@ -29,6 +29,8 @@ const SHIM = `
   buildDetails,
   appendMessage,
   sendMessage,
+  _splitCompleteSentences,
+  _shouldSpeak,
   get conversationHistory() { return conversationHistory; },
 };
 `;

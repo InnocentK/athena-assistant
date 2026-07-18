@@ -191,16 +191,51 @@ class VoiceController {
    * @param {string} text - The text to synthesise and speak.
    * @param {string} [voiceName] - M30.6: a SpeechSynthesis voice name from
    *   listVoices(); unknown/empty falls back to the browser default.
+   * @returns {SpeechSynthesisUtterance|null} M31.0: the utterance (so callers
+   *   can watch `onend`), or null when TTS is unsupported or text is empty.
    */
   speak(text, voiceName) {
+    var utterance = this._makeUtterance(text, voiceName);
+    if (!utterance) {
+      return null;
+    }
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+    return utterance;
+  }
+
+  /**
+   * M31.0: like speak(), but WITHOUT the leading cancel() — the utterance
+   * queues behind whatever is already speaking. This is the streaming-speech
+   * primitive: conversation mode enqueues each completed sentence as chunks
+   * arrive, and the synthesis engine plays them back-to-back (FIFO).
+   *
+   * @param {string} text
+   * @param {string} [voiceName]
+   * @returns {SpeechSynthesisUtterance|null} the queued utterance, or null.
+   */
+  enqueue(text, voiceName) {
+    var utterance = this._makeUtterance(text, voiceName);
+    if (!utterance) {
+      return null;
+    }
+    window.speechSynthesis.speak(utterance);
+    return utterance;
+  }
+
+  /**
+   * Build a configured utterance for `text`, honoring the voice pick.
+   * Returns null when TTS is unsupported or the text is empty (shared by
+   * speak() and enqueue() — M31.0).
+   * @private
+   */
+  _makeUtterance(text, voiceName) {
     if (!this.isTTSSupported) {
-      return;
+      return null;
     }
     if (!text || text.trim().length === 0) {
-      return;
+      return null;
     }
-
-    window.speechSynthesis.cancel();
 
     var utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 1.0;
@@ -217,8 +252,7 @@ class VoiceController {
       }
       // No match → browser default (voices load async; never block speech).
     }
-
-    window.speechSynthesis.speak(utterance);
+    return utterance;
   }
 
   /**

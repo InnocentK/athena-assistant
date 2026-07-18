@@ -47,10 +47,12 @@ is the source of truth for what actually shipped.
 | [M30.8-voice-settings-polish.md](M30.8-voice-settings-polish.md) | Voice settings polish (cutoff + Test) | 3.0.7 |
 | [M30.9-temporal-context.md](M30.9-temporal-context.md) | Temporal context in the system prompt | 3.0.8 |
 | [M30.10-3.0.z-review.md](M30.10-3.0.z-review.md) | Scoped review of the 3.0.z wave | no bump |
+| [M31.0-conversation-mode.md](M31.0-conversation-mode.md) | Conversation mode (Voice epic opener) | **3.1.0** |
 
 ## Approved, pending implementation
 
-*(none — 3.0.0 shipped; the next milestone starts from a fresh spec)*
+*(none — 3.1.0 shipped; whether M31.1+ [Athena Live] happens is decided by
+living with the M31.0 probe, per the CLAUDE.md Voice-epic roadmap)*
 
 Review reports live in [`../history/`](../history/) (REVIEW-2026-07,
 REVIEW-3.0-2026-07). The review-cadence rule — when the next review is due —

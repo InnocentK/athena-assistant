@@ -78,6 +78,24 @@ error). To get installability over a tailnet, terminate TLS — `tailscale serve
 other words, the PWA is polish layered on the same remote-access setup, not a
 way around it.
 
+### Voice / conversation mode is browser- and transport-dependent (M31.0)
+
+The voice features (M30.6 controls, M31.0 conversation mode) ride the
+browser's **Web Speech API**, so support follows the *browser*, not the OS:
+speech *output* (TTS) works in all modern browsers, but speech *input* (the
+mic button, and therefore the hands-free loop) is **Chromium/Safari only** —
+Firefox ships no usable SpeechRecognition. The mic additionally requires a
+**secure context** (same rule as the PWA above: HTTPS or localhost), so over
+a tailnet you need `tailscale serve`/TLS before the mic button will work.
+Two more honest limits: **CLI-transport providers answer whole**, so their
+"streaming speech" is one utterance after the wait — the live feel needs an
+API transport (chatgpt / grok-api / ollama); and replies are spoken **as
+written** (markdown syntax and code blocks included). Headphones are
+recommended in conversation mode — the mic never opens while Athena is
+speaking, but speaker echo into an open mic is physically possible. On
+narrow/mobile layouts (<600px) the mic button is hidden, so conversation
+mode is a desktop-browser feature today.
+
 ## See also
 
 - [INSTALLATION.md](INSTALLATION.md) — installing and running (local or Docker).

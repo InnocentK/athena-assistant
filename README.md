@@ -8,11 +8,14 @@ layer. Designed to run in Docker on modest hardware.
 
 Features include **streamed responses** (answers render as they are generated,
 in the browser and the CLI — API-backed providers stream; CLI-backed providers
-answer whole and degrade gracefully), multi-profile support, a YAML-backed
-memory system with a review queue, persistent conversations, an allowlisted
-file browser with uploads, optional CalDAV / CardDAV / Nextcloud integrations
-(read-mostly, disabled by default), provider latency + token-usage
-diagnostics, and editable settings.
+answer whole and degrade gracefully), a **hands-free conversation mode**
+(replies are spoken sentence-by-sentence as they stream, the mic re-opens when
+Athena finishes, and talking interrupts her — browser Web Speech, opt-in, see
+[docs/PLATFORMS.md](docs/PLATFORMS.md) for the honest limits), multi-profile
+support, a YAML-backed memory system with a review queue, persistent
+conversations, an allowlisted file browser with uploads, optional CalDAV /
+CardDAV / Nextcloud integrations (read-mostly, disabled by default), provider
+latency + token-usage diagnostics, and editable settings.
 
 ## Quick start
 

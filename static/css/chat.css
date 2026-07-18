@@ -1240,6 +1240,16 @@ body {
   color: #ccc;
 }
 
+/* M31.0: the hands-free conversation loop is armed — the mic will re-open
+   after each reply. Declared BEFORE .listening so the red "mic hot" pulse
+   wins the shared properties while actually listening; the green ring
+   (box-shadow, which .listening never sets) persists through both states. */
+#ptt-btn.conversation-live {
+  border-color: #2fbf8f;
+  color: #4fd9a8;
+  box-shadow: 0 0 0 2px rgba(47, 191, 143, 0.35);
+}
+
 #ptt-btn.listening {
   background: #4a1a1a;
   border-color: #cc4444;

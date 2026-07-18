@@ -41,7 +41,13 @@ const _panelLoadToken = { memory: 0, settings: 0, history: 0 };
    accessibility/interaction settings (phone ≠ desktop needs).
    --------------------------------------------------------- */
 const _VOICE_PREFS_KEY = "athena-voice-prefs";
-const _VOICE_PREF_DEFAULTS = { speak: false, voiceName: "", autoSend: false, continuous: false };
+const _VOICE_PREF_DEFAULTS = {
+  speak: false,
+  voiceName: "",
+  autoSend: false,
+  continuous: false,
+  conversation: false, // M31.0: hands-free conversation mode (default OFF)
+};
 let _voicePrefsMem = null; // fallback when localStorage throws (private mode)
 
 function getVoicePrefs() {
@@ -68,6 +74,162 @@ function setVoicePref(key, value) {
   } catch (_) {
     _voicePrefsMem = prefs;
   }
+}
+
+
+/* ---------------------------------------------------------
+   Conversation mode (M31.0) — streaming speech, hands-free
+   loop, and barge-in. Everything here is gated on the
+   `conversation` pref (default OFF): with it off, behavior is
+   exactly the M30.6 opt-in TTS. Speech is a VIEW of the answer
+   — cancelling it never suppresses rendering (INVARIANTS).
+   --------------------------------------------------------- */
+
+/** M31.0 (A2): the one TTS gate. Conversation mode implies speaking for the
+ *  session; the stored `speak` pref is never rewritten. */
+function _shouldSpeak(vp) {
+  return !!(vp.speak || vp.conversation);
+}
+
+// The hands-free loop is ARMED only by a user mic click while the pref is on
+// (browser gesture policies — the mic never opens without a prior gesture).
+let _convoArmed = false;
+// Monotonic speech-turn generation: stale turns' utterance events can never
+// drive the loop after a newer turn (or typed send) supersedes them.
+let _speechGen = 0;
+// Set just before a voice-initiated sendMessage() (auto-sent transcript) so
+// typed sends — and only typed sends — exit the loop.
+let _voiceSend = false;
+
+function _convoArm() {
+  _convoArmed = true;
+  const btn = document.getElementById("ptt-btn");
+  if (btn) btn.classList.add("conversation-live");
+}
+
+function _convoDisarm() {
+  _convoArmed = false;
+  const btn = document.getElementById("ptt-btn");
+  if (btn) btn.classList.remove("conversation-live");
+}
+
+/**
+ * Re-open the mic after Athena finishes speaking (the hands-free loop).
+ * Deferred a tick so the turn's `finally` (isThinking=false) settles first.
+ * Every guard re-checks live state: the loop stops on mic-off, typed send,
+ * STT error, hidden tab, or the pref being toggled off mid-turn.
+ */
+function _convoResume() {
+  setTimeout(function () {
+    if (!_convoArmed || document.hidden || isThinking) return;
+    const vp = getVoicePrefs();
+    if (!vp.conversation) return;
+    if (typeof voice === "undefined" || !voice.isSupported || voice.isListening) return;
+    try { voice.cancelSpeech(); } catch (_) {} // never listen while speaking
+    voice.continuous = vp.continuous;
+    try { voice.startListening(); } catch (_) {}
+  }, 0);
+}
+
+// Minimum candidate length (chars) before a `.` `!` `?` may end a sentence.
+// The deliberately-dumb abbreviation guard: "e.g." / "Dr." never stand alone,
+// and very short sentences merge forward into the next utterance.
+const _MIN_SENTENCE = 12;
+
+/**
+ * M31.0: split the COMPLETE sentences off the front of `text`.
+ * A boundary is `.` `!` or `?` followed by a whitespace character — never
+ * end-of-buffer, because mid-stream the next chunk could continue the word
+ * (the done-path flushes the tail). Returns {sentences: string[], rest}.
+ */
+function _splitCompleteSentences(text) {
+  const sentences = [];
+  let start = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch !== "." && ch !== "!" && ch !== "?") continue;
+    const next = text[i + 1];
+    if (next === undefined || !/\s/.test(next)) continue; // not a confirmed boundary
+    const candidate = text.slice(start, i + 1);
+    if (candidate.trim().length < _MIN_SENTENCE) continue; // abbreviation guard
+    sentences.push(candidate.trim());
+    start = i + 1;
+  }
+  return { sentences: sentences, rest: text.slice(start) };
+}
+
+/**
+ * Open a speech turn for a streaming reply, or null when conversation mode
+ * is off / TTS unavailable / voice.js is stale (missing enqueue) — null means
+ * the done-path falls back to the M30.6 whole-reply speak.
+ */
+function _beginConvoTurn() {
+  const vp = getVoicePrefs();
+  if (!vp.conversation) return null;
+  if (typeof voice === "undefined" || !voice.isTTSSupported) return null;
+  if (typeof voice.enqueue !== "function") return null;
+  _speechGen += 1;
+  return { gen: _speechGen, spokenUpTo: 0, last: null, complete: false, voiceName: vp.voiceName };
+}
+
+/** Speak any newly-completed sentences in `assembled` (chunk-time hook). */
+function _convoSpeakNewSentences(convo, assembled) {
+  const parts = _splitCompleteSentences(assembled.slice(convo.spokenUpTo));
+  for (let i = 0; i < parts.sentences.length; i++) {
+    _convoEnqueue(convo, parts.sentences[i]);
+  }
+  convo.spokenUpTo = assembled.length - parts.rest.length;
+}
+
+function _convoEnqueue(convo, sentence) {
+  if (!sentence) return;
+  try {
+    const u = voice.enqueue(sentence, convo.voiceName);
+    if (u) {
+      convo.last = u;
+      u.onend = function () { _convoUtteranceEnded(convo, u); };
+    }
+  } catch (_) {}
+}
+
+function _convoUtteranceEnded(convo, u) {
+  u._athenaEnded = true;
+  if (convo.gen !== _speechGen) return; // a newer turn owns the loop
+  if (convo.complete && convo.last === u) _convoResume();
+}
+
+/**
+ * Close a streaming speech turn at its terminal render point. The tail is the
+ * unspoken remainder of the ASSEMBLED chunks — the done-event's authoritative
+ * `fullText` reconcile stays visual-only and is never re-spoken. (`fullText`
+ * is spoken only in the defensive no-chunks success case, where nothing was
+ * ever streamed or spoken — that is the buffered-style whole-reply turn.)
+ * Once speech fully ends — or nothing was ever spoken (A3: failed/empty
+ * turns) — the hands-free loop re-opens the mic.
+ */
+function _convoFinishTurn(convo, assembled, fullText) {
+  const nothingSpoken = convo.last === null && convo.spokenUpTo === 0;
+  const tail = nothingSpoken
+    ? (assembled || fullText || "")
+    : assembled.slice(convo.spokenUpTo);
+  _convoEnqueue(convo, tail.trim());
+  convo.complete = true;
+  if (!convo.last || convo.last._athenaEnded) _convoResume();
+}
+
+/**
+ * A turn that ended with nothing (left) worth speaking — network error,
+ * HTTP error, malformed body, or a provider failure envelope. Silence any
+ * queued speech and re-open the mic immediately (A3): "try again" spoken
+ * into the re-armed mic is the natural conversational recovery.
+ */
+function _convoTurnFailedSilently() {
+  const vp = getVoicePrefs();
+  if (!vp.conversation) return;
+  if (typeof voice !== "undefined") {
+    try { voice.cancelSpeech(); } catch (_) {}
+  }
+  _convoResume();
 }
 
 
@@ -103,9 +265,17 @@ document.addEventListener("DOMContentLoaded", () => {
     voice.onTranscript = function(text) {
       messageInput.value = text;
       autoResizeTextarea();
+      const vpT = getVoicePrefs();
+      // M31.0 barge-in: a delivered transcript silences any ongoing speech.
+      if (vpT.conversation) {
+        try { voice.cancelSpeech(); } catch (_) {}
+      }
       // M30.6: auto-send is opt-in — by default the transcript lands in the
-      // input for review, exactly like typed text.
-      if (getVoicePrefs().autoSend) {
+      // input for review, exactly like typed text. M31.0 (A1): conversation
+      // mode implies auto-send for the session (a hands-free loop that waits
+      // for a manual Send isn't hands-free); the stored pref is not rewritten.
+      if (vpT.autoSend || vpT.conversation) {
+        _voiceSend = true; // consumed at the top of sendMessage()
         sendMessage();
       } else {
         messageInput.focus();
@@ -113,6 +283,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     voice.onError = function(msg) {
+      _convoDisarm(); // M31.0: an STT error ends the hands-free loop
       appendMessage('error', msg, null, null);
       setStatusDot('error');
     };
@@ -131,13 +302,30 @@ document.addEventListener("DOMContentLoaded", () => {
 
     pttBtn.addEventListener('click', function() {
       if (voice.isListening) {
+        // M31.0: an explicit mic-off click ends the hands-free loop.
+        _convoDisarm();
         voice.stopListening();
       } else {
+        const vpMic = getVoicePrefs();
+        if (vpMic.conversation) {
+          // M31.0: the mic CLICK is the user gesture that arms the loop
+          // (auto-listen never starts without one), and barge-in cancels
+          // any ongoing speech before the mic opens — in that order, so
+          // the mic never listens while Athena is speaking.
+          _convoArm();
+          try { voice.cancelSpeech(); } catch (_) {}
+        }
         // M30.6: continuous mode keeps listening across pauses until the
         // button is clicked again; default stays stop-on-pause.
-        voice.continuous = getVoicePrefs().continuous;
+        voice.continuous = vpMic.continuous;
         voice.startListening();
       }
+    });
+
+    // M31.0: losing tab visibility ends the hands-free loop (never a
+    // hidden auto-reopening mic in a background tab).
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) _convoDisarm();
     });
   } else {
     // Browser doesn't support Web Speech API — leave button disabled with tooltip
@@ -260,10 +448,23 @@ async function loadProviders() {
    Send message (M30: streaming-first, buffered fallback)
    --------------------------------------------------------- */
 async function sendMessage() {
+  // M31.0: consume the voice-initiated marker before any early return.
+  const fromVoice = _voiceSend;
+  _voiceSend = false;
+
   if (isThinking) return;
 
   const text = messageInput.value.trim();
   if (!text) return;
+
+  // M31.0: switching to typed input exits the hands-free loop (no-op when
+  // the loop was never armed) …
+  if (!fromVoice) _convoDisarm();
+  // … and in conversation mode any new send silences the previous reply
+  // (barge-in). Rendering is untouched — speech is a view of the answer.
+  if (getVoicePrefs().conversation && typeof voice !== "undefined") {
+    try { voice.cancelSpeech(); } catch (_) {}
+  }
 
   // Enter thinking state
   isThinking = true;
@@ -334,6 +535,9 @@ async function _sendStreaming(text, historyToSend) {
   let stream = null; // {wrapper, bubble} — created on the first chunk
   let assembled = "";
   let data = null; // the `done` event's payload (mirrors ChatResponse)
+  // M31.0: conversation mode speaks sentences as chunks complete them
+  // (null when the mode is off — then the done-path speaks whole, as M30.6).
+  const convo = _beginConvoTurn();
 
   try {
     for (;;) {
@@ -357,6 +561,7 @@ async function _sendStreaming(text, historyToSend) {
             assembled += t;
             stream.bubble.textContent = assembled; // textContent — no XSS
             scrollToBottom();
+            if (convo) _convoSpeakNewSentences(convo, assembled); // M31.0
           }
         } else if (frame.event === "done") {
           data = payload;
@@ -368,6 +573,9 @@ async function _sendStreaming(text, historyToSend) {
     if (!stream) return false; // nothing rendered — buffered fallback
     appendMessage("error", "The stream was interrupted.", null, null);
     setStatusDot("error");
+    // M31.0: close the speech turn with no tail — already-queued sentences
+    // finish speaking, then the loop re-opens the mic (A3 when none queued).
+    if (convo) _convoFinishTurn(convo, "", "");
     return true; // partial text already visible: do NOT re-send via /chat
   }
 
@@ -375,6 +583,7 @@ async function _sendStreaming(text, historyToSend) {
     if (!stream) return false; // no chunks, no done — safe to fall back
     appendMessage("error", "The stream ended unexpectedly.", null, null);
     setStatusDot("error");
+    if (convo) _convoFinishTurn(convo, "", ""); // M31.0 (as above)
     return true;
   }
 
@@ -390,6 +599,7 @@ async function _sendStreaming(text, historyToSend) {
     appendMessage("error", reason, data.provider, data.model);
     setStatusDot("error");
     appendDiagnostics(data.diagnostics);
+    _convoTurnFailedSilently(); // M31.0 (A3): failed turns re-open the mic
     return true;
   }
 
@@ -411,7 +621,12 @@ async function _sendStreaming(text, historyToSend) {
   }
   // M30.6: reading answers aloud is opt-in (default off), with the chosen voice.
   const vpStream = getVoicePrefs();
-  if (vpStream.speak && typeof voice !== "undefined" && voice.isTTSSupported) {
+  if (convo) {
+    // M31.0: sentences were already spoken as they arrived — finish with the
+    // unspoken tail of the ASSEMBLED text. The authoritative-text reconcile
+    // above stays visual-only: reconciled text is never re-spoken.
+    _convoFinishTurn(convo, assembled, fullText);
+  } else if (_shouldSpeak(vpStream) && typeof voice !== "undefined" && voice.isTTSSupported) {
     try {
       voice.speak(fullText, vpStream.voiceName);
     } catch (_) {}
@@ -442,6 +657,7 @@ async function _sendBuffered(text, historyToSend) {
   } catch (_) {
     appendMessage("error", "Network error — could not reach the assistant.", null, null);
     setStatusDot("error");
+    _convoTurnFailedSilently(); // M31.0 (A3)
     return; // sendMessage's finally still resets input state
   }
 
@@ -454,6 +670,7 @@ async function _sendBuffered(text, historyToSend) {
     } catch (_) {}
     appendMessage("error", detail, null, null);
     setStatusDot("error");
+    _convoTurnFailedSilently(); // M31.0 (A3)
     return;
   }
 
@@ -463,6 +680,7 @@ async function _sendBuffered(text, historyToSend) {
   } catch (_) {
     appendMessage("error", "Received a malformed response from the assistant.", null, null);
     setStatusDot("error");
+    _convoTurnFailedSilently(); // M31.0 (A3)
     return;
   }
 
@@ -477,6 +695,7 @@ async function _sendBuffered(text, historyToSend) {
     // failed." would be replayed to providers on every later message.
     appendMessage("error", data.response, data.provider, data.model);
     setStatusDot("error");
+    _convoTurnFailedSilently(); // M31.0 (A3): failed turns re-open the mic
   } else {
     conversationHistory.push({ role: "assistant", content: data.response });
     appendMessage("assistant", data.response, data.provider, data.model);
@@ -487,9 +706,19 @@ async function _sendBuffered(text, historyToSend) {
     // Speak the response if enabled (M30.6: opt-in, default off). Guarded so
     // a missing voice.js (or a speak() error) can't break the rendered answer.
     const vpBuf = getVoicePrefs();
-    if (vpBuf.speak && typeof voice !== "undefined" && voice.isTTSSupported) {
+    if (_shouldSpeak(vpBuf) && typeof voice !== "undefined" && voice.isTTSSupported) {
       try {
-        voice.speak(data.response, vpBuf.voiceName);
+        const u = voice.speak(data.response, vpBuf.voiceName);
+        if (u && vpBuf.conversation) {
+          // M31.0 (A4): buffered turns speak whole — arm the hands-free
+          // loop on that single utterance's end (same machinery as
+          // streaming; A3 vacuous-resume when speak() returned null).
+          _speechGen += 1;
+          const bufTurn = { gen: _speechGen, last: u, complete: true };
+          u.onend = function () { _convoUtteranceEnded(bufTurn, u); };
+        } else if (!u && vpBuf.conversation) {
+          _convoResume(); // nothing speakable (A3)
+        }
       } catch (_) {}
     }
   }
@@ -1387,6 +1616,15 @@ async function loadSettingsProfile() {
     // Deliberately separate from the server-persisted "Save settings" above.
     body.appendChild(_settingsSectionTitle("Voice"));
     const vp = getVoicePrefs();
+    // M31.0: the headline toggle — speaks replies sentence-by-sentence as
+    // they stream, auto-reopens the mic when Athena finishes (armed by a mic
+    // click), and lets you interrupt by talking. Implies speak + auto-send
+    // for the session without rewriting those stored prefs.
+    body.appendChild(
+      _voiceToggleRow("Conversation mode", "conversation", vp.conversation, function (on) {
+        if (!on) _convoDisarm(); // toggling off ends a live loop immediately
+      })
+    );
     body.appendChild(_voiceToggleRow("Speak responses aloud", "speak", vp.speak));
 
     const voiceSelect = document.createElement("select");
@@ -1440,7 +1678,10 @@ async function loadSettingsProfile() {
     const voiceNote = document.createElement("div");
     voiceNote.className = "settings-note";
     voiceNote.textContent =
-      "Voice settings apply immediately and are saved in this browser (not the profile).";
+      "Voice settings apply immediately and are saved in this browser (not the profile). " +
+      "Conversation mode speaks replies as they stream and re-opens the mic after " +
+      "Athena finishes — click the mic once to start the hands-free loop " +
+      "(headphones recommended; it implies speak + auto-send while on).";
     body.appendChild(voiceNote);
 
     // --- Read-only context (not editable in this milestone) ---
@@ -1471,13 +1712,15 @@ function _settingsSelect(options, current) {
   return sel;
 }
 
-/** M30.6: one instant-apply voice-pref checkbox row (localStorage-backed). */
-function _voiceToggleRow(label, prefKey, checked) {
+/** M30.6: one instant-apply voice-pref checkbox row (localStorage-backed).
+ *  M31.0: optional onChange(checked) side hook (conversation-loop disarm). */
+function _voiceToggleRow(label, prefKey, checked, onChange) {
   const cb = document.createElement("input");
   cb.type = "checkbox";
   cb.checked = !!checked;
   cb.addEventListener("change", function () {
     setVoicePref(prefKey, cb.checked);
+    if (onChange) onChange(cb.checked);
   });
   return _settingsControlRow(label, cb);
 }

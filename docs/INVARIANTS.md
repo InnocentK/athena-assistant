@@ -471,10 +471,32 @@ This file is the durable contract; per-release history lives in
   in `localStorage` (guarded — private-mode throws fall back to memory);
   speak-responses and transcript auto-send default OFF. Do NOT migrate these
   into profile.yaml's editable set — they are per-device accessibility
-  settings, and both TTS call sites must stay pref-gated (test-pinned).
+  settings, and both TTS call sites must stay pref-gated (test-pinned via
+  the `_shouldSpeak(` count since M31.0).
+- **Speech is a VIEW of the answer (M31.0).** Barge-in / `cancelSpeech()` /
+  a failed utterance must never suppress, truncate, or alter the *rendered*
+  text or what is recorded to history — cancelling speech cancels sound,
+  nothing else. The conversation-mode `conversation` pref is browser-local
+  like its M30.6 siblings (default OFF); with it OFF, every M31.0 path is
+  inert (pinned by the untouched M30.6 suites).
+- **The hands-free loop arms ONLY on a user mic click (M31.0).** Browser
+  mic/autoplay policies require a gesture; `_convoArm()` has exactly one
+  call site — the `#ptt-btn` handler — and the count is test-pinned. Auto
+  re-listen must cancel synthesis BEFORE opening the mic (the mic never
+  listens while Athena speaks — the echo/self-hearing mitigation), and the
+  loop must stop on: mic-off click, typed send, STT error, hidden tab,
+  toggle-off (all five disarm sites are count-pinned).
+- **`voice.enqueue()` never cancels (M31.0).** It is the sentence-queueing
+  primitive — a cancel inside it would clip the sentence currently being
+  spoken every time a new chunk arrived. `speak()` keeps cancel-then-say
+  (Test button, whole-reply mode) and returns its utterance (A4). The
+  done-event's authoritative-text reconcile is visual-only: the spoken tail
+  derives from the ASSEMBLED streamed text, never `data.response` (both
+  test-pinned in `tests/test_ui_correctness.py`).
 - Tests: `tests/test_ui_correctness.py` (source-structure guards; no JS runtime
   in the suite by design); `tests/test_pwa.py` + `tests/js/pwa.test.js` (M26.28);
-  `tests/js/voicePrefs.test.js` (M30.6).
+  `tests/js/voicePrefs.test.js` (M30.6); `tests/js/conversationMode.test.js`
+  (M31.0).
 
 ## CLI (M16/M17/M25/M26.6)
 
