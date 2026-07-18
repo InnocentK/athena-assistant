@@ -317,8 +317,11 @@ pure-LLM chat (→ 3.0.6, *shipped*). Pt 2 queue (2026-07-17): **M30.8** voice
 settings polish — dropdown shrink fix + Test-voice button (→ 3.0.7,
 *shipped*); **M30.9** temporal context — date/time+TZ appended to the
 provider-bound system prompt (→ 3.0.8, *shipped*). **Both triage queues are
-complete.** Further 3.0.z milestones come from continued testing (mobile
-pass pending).
+complete**, the mobile pass is done (M28.4 layout verified live; PWA needs
+the documented HTTPS step — no code), and **M30.10** (no bump) ran the
+cadence-rule scoped review of the whole wave: FIX none / DEFER none / BLESS
+five (`docs/history/REVIEW-3.0.z-2026-07.md`). **3.1 is clear to start** —
+M31.0's spec is written and awaiting the user's personal review.
 
 *M31 — Voice epic (3.1.y).* Live-voice research (products, protocols,
 pricing, self-hosted pipelines) is summarized in the M31.0 spec when written;

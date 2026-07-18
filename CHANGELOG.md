@@ -4,6 +4,16 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [Unreleased] — Milestone 30.10 — Scoped review of the 3.0.z wave
+
+Docs only — **no code change; the app stays 3.0.8**. Spec:
+`docs/specs/M30.10-3.0.z-review.md`. The cadence rule's ≥5-autonomous-
+milestones trigger, run before the M31 Voice epic: six-lens review of
+M30.1–M30.9 with targeted live verification of the three least-certain
+mechanisms. Report: `docs/history/REVIEW-3.0.z-2026-07.md`. **FIX: none;
+DEFER: none new; BLESS: five observations recorded.** The road to 3.1 is
+clear; M31.0's spec goes to the user for personal review next.
+
 ## [3.0.8] — Milestone 30.9 — Temporal context in the system prompt
 
 **App bumped to 3.0.8.** Spec: `docs/specs/M30.9-temporal-context.md`. "What
