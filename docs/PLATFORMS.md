@@ -92,9 +92,17 @@ Two more honest limits: **CLI-transport providers answer whole**, so their
 API transport (chatgpt / grok-api / ollama); and replies are spoken **as
 written** (markdown syntax and code blocks included). Headphones are
 recommended in conversation mode — the mic never opens while Athena is
-speaking, but speaker echo into an open mic is physically possible. On
-narrow/mobile layouts (<600px) the mic button is hidden, so conversation
-mode is a desktop-browser feature today.
+speaking, but speaker echo into an open mic is physically possible.
+
+**On phones (M31.1):** the mic button is present on narrow layouts, and
+conversation mode works in mobile Chrome/Safari **once the page is served
+over HTTPS** (`tailscale serve` — see above; over bare `http://` phones
+grant no mic access at all, though speech *output* still works). Two phone
+realities, both by design: switching apps or locking the screen **disarms
+the hands-free loop** (the tab loses visibility — Athena never keeps an
+auto-reopening mic in a background tab), so the loop lives only while the
+tab is front-and-center; and iOS may need one Settings → "Test voice" tap
+the first time to unlock audio playback.
 
 ## See also
 

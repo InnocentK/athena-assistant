@@ -161,6 +161,20 @@ def test_done_path_tail_is_streamed_text_not_reconciled():
     assert "assembled.slice(convo.spokenUpTo)" in _CHAT_JS
 
 
+def test_mobile_layout_keeps_mic_button():
+    # M31.1: conversation mode arms ONLY from the mic button, so phones must
+    # have it. M28.4's space-saving `display: none` (from before the Voice
+    # epic) must never return: the narrow-screen media block may RESTYLE
+    # #ptt-btn (it slims it), but never hide it.
+    mq = _CHAT_CSS[_CHAT_CSS.index("@media (max-width: 600px)"):]
+    assert "#ptt-btn" in mq  # the compensating size rule exists
+    idx = mq.find("#ptt-btn")
+    while idx != -1:
+        block = mq[idx:mq.index("}", idx)]
+        assert "display: none" not in block
+        idx = mq.find("#ptt-btn", idx + 1)
+
+
 def test_hands_free_loop_requires_gesture_and_stops_everywhere():
     # The loop arms ONLY inside the mic-click handler (browser gesture
     # policies): definition + exactly one call site. A second arm site means

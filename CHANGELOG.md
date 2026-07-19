@@ -4,6 +4,30 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [3.1.1] — Milestone 31.1 — Mobile voice enablement
+
+**App bumped to 3.1.1.** Spec: `docs/specs/M31.1-mobile-voice.md` (user:
+"this is where I want to test it out"). Conversation mode was untestable on
+phones: M28.4's narrow-screen CSS hid the mic button entirely — and the mic
+click is the only gesture that can arm the M31.0 hands-free loop.
+
+### Fixed
+- The `<600px` media block no longer hides `#ptt-btn`; the mic slims to
+  34px (attach padding tightened to compensate) so the footer still fits a
+  375px screen. Test-pinned: the narrow-screen block may restyle the mic
+  but can never `display: none` it again.
+
+### Notes
+- The other half of mobile enablement is operator-side, not code: phone
+  browsers grant mic access only over HTTPS, so the tailnet URL from
+  `tailscale serve --bg 8000` (REMOTE-ACCESS.md) is required — same step
+  that unlocks PWA install. PLATFORMS.md now documents the phone realities:
+  app-switch/screen-lock disarms the loop by design; iOS may need one
+  Test-voice tap to unlock audio.
+- Roadmap renumber: Athena Live (the self-hosted pipeline, if the probe
+  earns it) is **M31.2+** now.
+- Gate: ruff + mypy exit 0 + 620 pytest + 52 vitest.
+
 ## [3.1.0] — Milestone 31.0 — Conversation mode (the Voice epic opens)
 
 **App bumped to 3.1.0** (minor — epic opener). Spec:

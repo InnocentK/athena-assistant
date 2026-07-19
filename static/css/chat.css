@@ -1288,8 +1288,18 @@ body {
     gap: 6px;
   }
 
+  /* M31.1: the mic STAYS on phones — the mic click is the only control
+     that arms the conversation loop (M31.0). M28.4 hid it here to save
+     footer space back when voice was dictation-only; now it's the headline
+     control, so it slims down instead of disappearing. */
   #ptt-btn {
-    display: none;
+    width: 34px;
+    height: 36px;
+    font-size: 0.9rem;
+  }
+
+  #attach-btn {
+    padding: 8px 8px;
   }
 
   #send-btn {

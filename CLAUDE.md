@@ -340,10 +340,18 @@ spec; the decision record is this entry.
   per-minute cost. KNOWN LIMITS stated in PLATFORMS.md: Web Speech STT is
   Chromium/Safari (not Firefox); CLI-transport providers answer whole
   (voice waits — same honest degrade as M30 text streaming); the mic needs
-  a secure context (HTTPS over Tailscale — REMOTE-ACCESS.md); <600px
-  layouts hide the mic (desktop-first). M31.0 is deliberately the CHEAP
-  PROBE — **the probe is now running: live with it before building more.**
-- **M31.1+ — Athena Live (self-hosted cascaded voice)** — only if the M31.0
+  a secure context (HTTPS over Tailscale — REMOTE-ACCESS.md). M31.0 is
+  deliberately the CHEAP PROBE — **the probe is now running: live with it
+  before building more.**
+- **M31.1 — Mobile voice enablement** (→ **3.1.1, SHIPPED**; spec
+  `docs/specs/M31.1-mobile-voice.md`): the user's probe target is the
+  phone. M28.4's narrow-screen CSS hid `#ptt-btn` — the only control that
+  can arm the loop — so it now slims instead of disappearing (pinned:
+  the media block may restyle the mic, never hide it). The HTTPS half is
+  operator-side (`tailscale serve` per REMOTE-ACCESS.md; phones grant no
+  mic over bare http). Phone realities documented in PLATFORMS: app-switch/
+  screen-lock disarms the loop by design; iOS may need one Test-voice tap.
+- **M31.2+ — Athena Live (self-hosted cascaded voice)** — only if the M31.0
   probe earns it; staged mini-milestones, spec'd separately: (a) local Piper/
   Kokoro TTS endpoint (better voices than SpeechSynthesis, standalone win);
   (b) WebSocket audio path on FastAPI; (c) server STT via faster-whisper

@@ -48,10 +48,11 @@ is the source of truth for what actually shipped.
 | [M30.9-temporal-context.md](M30.9-temporal-context.md) | Temporal context in the system prompt | 3.0.8 |
 | [M30.10-3.0.z-review.md](M30.10-3.0.z-review.md) | Scoped review of the 3.0.z wave | no bump |
 | [M31.0-conversation-mode.md](M31.0-conversation-mode.md) | Conversation mode (Voice epic opener) | **3.1.0** |
+| [M31.1-mobile-voice.md](M31.1-mobile-voice.md) | Mobile voice enablement (mic on phones) | 3.1.1 |
 
 ## Approved, pending implementation
 
-*(none — 3.1.0 shipped; whether M31.1+ [Athena Live] happens is decided by
+*(none — 3.1.1 shipped; whether M31.2+ [Athena Live] happens is decided by
 living with the M31.0 probe, per the CLAUDE.md Voice-epic roadmap)*
 
 Review reports live in [`../history/`](../history/) (REVIEW-2026-07,
