@@ -184,3 +184,10 @@ def test_hands_free_loop_requires_gesture_and_stops_everywhere():
     # click, STT error, hidden tab, typed send, settings toggle-off).
     assert _CHAT_JS.count("_convoDisarm()") == 6
     assert "visibilitychange" in _CHAT_JS
+    # M31.2: the turn earcon blips ONLY from the auto-reopen path (definition
+    # + the one _convoResume call site), and its AudioContext unlock rides
+    # the same arming mic-click gesture (definition + the one arm-branch
+    # call site) — a second call site of either means the gesture/auto-only
+    # contract changed; rethink before bumping.
+    assert _CHAT_JS.count("_playTurnEarcon(") == 2
+    assert _CHAT_JS.count("_earconUnlock(") == 2

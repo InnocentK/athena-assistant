@@ -113,6 +113,47 @@ function _convoDisarm() {
   if (btn) btn.classList.remove("conversation-live");
 }
 
+// M31.2: the turn earcon's AudioContext. Created/resumed ONLY inside the
+// mic-click gesture that arms the loop (browser autoplay policy) — the
+// earcon rides the same gesture-armed invariant as the loop itself.
+let _earconCtx = null;
+
+function _earconUnlock() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    if (!_earconCtx) _earconCtx = new AC();
+    if (_earconCtx.state === "suspended") _earconCtx.resume();
+  } catch (_) {
+    _earconCtx = null; // Web Audio broken → the loop simply stays silent
+  }
+}
+
+/**
+ * M31.2: a short rising two-tone blip — "your turn". Plays ONLY when the
+ * hands-free loop auto-reopens the mic (a manual click never blips: the
+ * user clicked, they know). Any failure is a silent no-op; the earcon must
+ * never break the loop.
+ */
+function _playTurnEarcon() {
+  try {
+    if (!_earconCtx || _earconCtx.state !== "running") return;
+    const t0 = _earconCtx.currentTime;
+    [[880, 0], [1174.66, 0.09]].forEach(function (pair) {
+      const osc = _earconCtx.createOscillator();
+      const gain = _earconCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = pair[0];
+      gain.gain.setValueAtTime(0.0001, t0 + pair[1]);
+      gain.gain.exponentialRampToValueAtTime(0.12, t0 + pair[1] + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + pair[1] + 0.07);
+      osc.connect(gain).connect(_earconCtx.destination);
+      osc.start(t0 + pair[1]);
+      osc.stop(t0 + pair[1] + 0.08);
+    });
+  } catch (_) {}
+}
+
 /**
  * Re-open the mic after Athena finishes speaking (the hands-free loop).
  * Deferred a tick so the turn's `finally` (isThinking=false) settles first.
@@ -126,6 +167,7 @@ function _convoResume() {
     if (!vp.conversation) return;
     if (typeof voice === "undefined" || !voice.isSupported || voice.isListening) return;
     try { voice.cancelSpeech(); } catch (_) {} // never listen while speaking
+    _playTurnEarcon(); // M31.2: audible "your turn" as the mic re-opens
     voice.continuous = vp.continuous;
     try { voice.startListening(); } catch (_) {}
   }, 0);
@@ -313,6 +355,7 @@ document.addEventListener("DOMContentLoaded", () => {
           // any ongoing speech before the mic opens — in that order, so
           // the mic never listens while Athena is speaking.
           _convoArm();
+          _earconUnlock(); // M31.2: same gesture unlocks the turn blip
           try { voice.cancelSpeech(); } catch (_) {}
         }
         // M30.6: continuous mode keeps listening across pauses until the

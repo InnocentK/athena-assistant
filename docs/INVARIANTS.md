@@ -485,7 +485,11 @@ This file is the durable contract; per-release history lives in
   re-listen must cancel synthesis BEFORE opening the mic (the mic never
   listens while Athena speaks — the echo/self-hearing mitigation), and the
   loop must stop on: mic-off click, typed send, STT error, hidden tab,
-  toggle-off (all five disarm sites are count-pinned).
+  toggle-off (all five disarm sites are count-pinned). The M31.2 turn
+  earcon rides the same invariant: its `AudioContext` is unlocked by that
+  same arming click, it blips ONLY from the auto-reopen path (both call
+  sites count-pinned), and any Web Audio failure is a silent no-op — the
+  loop must never depend on the earcon.
 - **`voice.enqueue()` never cancels (M31.0).** It is the sentence-queueing
   primitive — a cancel inside it would clip the sentence currently being
   spoken every time a new chunk arrived. `speak()` keeps cancel-then-say

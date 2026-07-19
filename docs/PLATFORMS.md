@@ -92,7 +92,9 @@ Two more honest limits: **CLI-transport providers answer whole**, so their
 API transport (chatgpt / grok-api / ollama); and replies are spoken **as
 written** (markdown syntax and code blocks included). Headphones are
 recommended in conversation mode — the mic never opens while Athena is
-speaking, but speaker echo into an open mic is physically possible.
+speaking, but speaker echo into an open mic is physically possible. A short
+rising blip (M31.2) marks each automatic mic re-open — that's the
+"your turn" cue in hands-free use.
 
 **On phones (M31.1):** the mic button is present on narrow layouts, and
 conversation mode works in mobile Chrome/Safari **once the page is served

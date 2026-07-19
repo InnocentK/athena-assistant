@@ -4,6 +4,30 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [3.1.2] — Milestone 31.2 — Audible turn indicator
+
+**App bumped to 3.1.2.** Spec: `docs/specs/M31.2-turn-earcon.md` — the first
+lived-experience refinement from the M31.0 probe (user: hands-free is
+eyes-free; you can't tell it's your turn). Decision recorded in the spec:
+the cue is transport-independent turn-taking UX that carries into Athena
+Live unchanged, so building it now is not throwaway work; the Live epic
+stays gated on probe experience and renumbers to **M31.3+**.
+
+### Added
+- A short rising two-tone Web Audio blip (~160 ms, no assets, no deps)
+  plays when the hands-free loop **auto-reopens** the mic — and only then;
+  a manual mic click never blips. The `AudioContext` is unlocked inside the
+  same mic-click gesture that arms the loop (autoplay policy — the earcon
+  rides the M31.0 gesture-armed invariant). Any Web Audio absence/failure
+  is a silent no-op; the loop itself never depends on it. No new pref for
+  the probe: the cue is intrinsic to conversation mode (a toggle is one
+  `_voiceToggleRow` away if lived experience wants it).
+
+### Notes
+- Gate: ruff + mypy exit 0 + 620 pytest + 54 vitest (2 new; the M31.0 loop
+  tests run with no AudioContext fake — their passing is the degradation
+  proof).
+
 ## [3.1.1] — Milestone 31.1 — Mobile voice enablement
 
 **App bumped to 3.1.1.** Spec: `docs/specs/M31.1-mobile-voice.md` (user:

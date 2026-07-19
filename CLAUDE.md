@@ -351,7 +351,13 @@ spec; the decision record is this entry.
   operator-side (`tailscale serve` per REMOTE-ACCESS.md; phones grant no
   mic over bare http). Phone realities documented in PLATFORMS: app-switch/
   screen-lock disarms the loop by design; iOS may need one Test-voice tap.
-- **M31.2+ — Athena Live (self-hosted cascaded voice)** — only if the M31.0
+- **M31.2 — Audible turn indicator** (→ **3.1.2, SHIPPED**; spec
+  `docs/specs/M31.2-turn-earcon.md`): the probe's first lived-experience
+  refinement — a Web Audio rising blip when the loop AUTO-reopens the mic
+  (never on manual clicks), AudioContext unlocked by the same arming
+  click. Decision recorded: turn cues are transport-independent and carry
+  into Athena Live; the epic itself stays probe-gated.
+- **M31.3+ — Athena Live (self-hosted cascaded voice)** — only if the M31.0
   probe earns it; staged mini-milestones, spec'd separately: (a) local Piper/
   Kokoro TTS endpoint (better voices than SpeechSynthesis, standalone win);
   (b) WebSocket audio path on FastAPI; (c) server STT via faster-whisper

@@ -370,3 +370,75 @@ describe("M31.0 — hands-free loop + barge-in", () => {
     expect(ptt.classList.contains("conversation-live")).toBe(false);
   });
 });
+
+/* ---------------------------------------------------------------- */
+describe("M31.2 — audible turn indicator", () => {
+  // NOTE: every M31.0 loop test above runs WITHOUT an AudioContext fake —
+  // their continued passing is the no-Web-Audio degradation proof.
+  class FakeAudioContext {
+    constructor() {
+      FakeAudioContext.last = this;
+      this.state = "running";
+      this.currentTime = 0;
+      this.destination = {};
+      this.oscillators = 0;
+    }
+    resume() {
+      this.state = "running";
+    }
+    createOscillator() {
+      this.oscillators++;
+      return {
+        type: "",
+        frequency: { value: 0 },
+        connect: (n) => n,
+        start() {},
+        stop() {},
+      };
+    }
+    createGain() {
+      return {
+        gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} },
+        connect: (n) => n,
+      };
+    }
+  }
+
+  async function bootWithAudio(streamParts, prefs) {
+    const spies = installSpeechFakes();
+    FakeAudioContext.last = null;
+    window.AudioContext = FakeAudioContext;
+    window.localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    const booted = await bootChat(streamFetch(streamParts));
+    return Object.assign({}, booted, spies, { ptt: document.getElementById("ptt-btn") });
+  }
+
+  const DONE = { success: true, response: FULL, provider: "p", model: null, conversation_id: null, diagnostics: null, error: null };
+
+  test("auto-reopen blips; the arming click itself does not", async () => {
+    const { speakSpy, ptt } = await bootWithAudio(
+      [frame("chunk", { text: FULL }), frame("done", DONE)],
+      { conversation: true }
+    );
+
+    ptt.click(); // gesture: unlocks the context, arms the loop — no blip
+    expect(FakeAudioContext.last).toBeTruthy();
+    expect(FakeAudioContext.last.oscillators).toBe(0);
+
+    window.voice.onTranscript("question one");
+    FakeRecognition.last.onend();
+    await settle();
+    speakSpy.mock.calls.forEach((c) => c[0].onend && c[0].onend());
+    await settle();
+
+    expect(window.voice.isListening).toBe(true); // loop re-opened…
+    expect(FakeAudioContext.last.oscillators).toBe(2); // …with the two-tone blip
+  });
+
+  test("conversation OFF: a dictation mic click creates no AudioContext", async () => {
+    const { ptt } = await bootWithAudio([], { conversation: false });
+    ptt.click();
+    expect(window.voice.isListening).toBe(true); // plain M30.6 dictation
+    expect(FakeAudioContext.last).toBe(null); // no unlock, no context
+  });
+});
