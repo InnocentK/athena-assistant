@@ -357,7 +357,14 @@ spec; the decision record is this entry.
   (never on manual clicks), AudioContext unlocked by the same arming
   click. Decision recorded: turn cues are transport-independent and carry
   into Athena Live; the epic itself stays probe-gated.
-- **M31.3+ — Athena Live (self-hosted cascaded voice)** — only if the M31.0
+- **M31.3 — Save reply as file** (→ **3.1.3, SHIPPED**; spec
+  `docs/specs/M31.3-save-reply.md`): probe finding #2 — "get me notes as
+  a markdown file" can't be done BY a provider (pure-LLM policy, M30.7,
+  deliberate). A per-reply Save button posts the reply through the
+  EXISTING /files/upload envelope (no new write surface, user-initiated
+  by construction). Voice-commanded saving stays in the Later
+  tool-calling safety framing.
+- **M31.4+ — Athena Live (self-hosted cascaded voice)** — only if the M31.0
   probe earns it; staged mini-milestones, spec'd separately: (a) local Piper/
   Kokoro TTS endpoint (better voices than SpeechSynthesis, standalone win);
   (b) WebSocket audio path on FastAPI; (c) server STT via faster-whisper

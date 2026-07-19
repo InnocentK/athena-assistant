@@ -265,6 +265,28 @@ body {
   padding: 0 2px;
 }
 
+/* M31.3: quiet per-reply Save button — meta-line furniture, not a CTA. */
+.meta .reply-save-btn {
+  background: none;
+  border: 1px solid #383838;
+  border-radius: 3px;
+  color: var(--color-text-secondary);
+  font-size: 0.65rem;
+  font-family: var(--font-ui);
+  padding: 1px 6px;
+  cursor: pointer;
+}
+
+.meta .reply-save-btn:hover:not(:disabled) {
+  border-color: #4a4a4a;
+  color: #ccc;
+}
+
+.meta .reply-save-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
 .meta .provider-label {
   color: #6a8abf;
   font-weight: 500;

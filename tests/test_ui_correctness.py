@@ -191,3 +191,19 @@ def test_hands_free_loop_requires_gesture_and_stops_everywhere():
     # contract changed; rethink before bumping.
     assert _CHAT_JS.count("_playTurnEarcon(") == 2
     assert _CHAT_JS.count("_earconUnlock(") == 2
+
+
+# --- M31.3: save reply as file — structure pins -------------------------------
+
+def test_save_reply_reuses_upload_envelope():
+    # The per-reply Save button is USER-initiated (the pure-LLM provider
+    # policy is untouched) and posts through the EXISTING /files/upload
+    # envelope — definition + exactly two render call sites (appendMessage
+    # assistant meta + _finishStreamingBubble). A new write endpoint here
+    # would be a second filesystem write path — do not.
+    assert _CHAT_JS.count("_replySaveButton(") == 3
+    seg = _CHAT_JS[_CHAT_JS.index("function _replySaveButton"):]
+    seg = seg[:seg.index("\nfunction ")]
+    assert '"/files/upload"' in seg      # the one write path
+    assert "reply-" in seg               # timestamped .md naming
+    assert ".reply-save-btn" in _CHAT_CSS

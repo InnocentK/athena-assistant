@@ -13,7 +13,8 @@ answer whole and degrade gracefully), a **hands-free conversation mode**
 Athena finishes, and talking interrupts her — browser Web Speech, opt-in, see
 [docs/PLATFORMS.md](docs/PLATFORMS.md) for the honest limits), multi-profile
 support, a YAML-backed memory system with a review queue, persistent
-conversations, an allowlisted file browser with uploads, optional CalDAV /
+conversations, an allowlisted file browser with uploads (any assistant
+reply can be saved as a markdown file with one click), optional CalDAV /
 CardDAV / Nextcloud integrations (read-mostly, disabled by default), provider
 latency + token-usage diagnostics, and editable settings.
 

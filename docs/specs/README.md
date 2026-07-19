@@ -50,10 +50,11 @@ is the source of truth for what actually shipped.
 | [M31.0-conversation-mode.md](M31.0-conversation-mode.md) | Conversation mode (Voice epic opener) | **3.1.0** |
 | [M31.1-mobile-voice.md](M31.1-mobile-voice.md) | Mobile voice enablement (mic on phones) | 3.1.1 |
 | [M31.2-turn-earcon.md](M31.2-turn-earcon.md) | Audible turn indicator (probe refinement) | 3.1.2 |
+| [M31.3-save-reply.md](M31.3-save-reply.md) | Save reply as file (probe finding #2) | 3.1.3 |
 
 ## Approved, pending implementation
 
-*(none — 3.1.2 shipped; whether M31.3+ [Athena Live] happens is decided by
+*(none — 3.1.3 shipped; whether M31.4+ [Athena Live] happens is decided by
 living with the M31.0 probe, per the CLAUDE.md Voice-epic roadmap)*
 
 Review reports live in [`../history/`](../history/) (REVIEW-2026-07,

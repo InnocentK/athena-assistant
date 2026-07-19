@@ -4,6 +4,28 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [3.1.3] — Milestone 31.3 — Save reply as file
+
+**App bumped to 3.1.3.** Spec: `docs/specs/M31.3-save-reply.md` — probe
+finding #2 (user asked chatgpt for "notes on Jupiter as a markdown file"
+and correctly got copy-paste instructions: every provider is a pure LLM by
+policy, M30.7).
+
+### Added
+- Every assistant reply's meta line gains a quiet **Save** button: the
+  reply text is uploaded as `reply-YYYYMMDD-HHMMSS.md` through the
+  **existing `/files/upload` envelope** (sanitized name, exclusive create,
+  10 MB cap, `data/uploads/` only — zero new write surface), then appears
+  in the Files tab and is attachable like any upload. Success shows
+  "Saved ✓" (path in the tooltip); failure re-enables for retry. Welcome
+  and error bubbles never get the button (failure text is not content).
+  USER-initiated by construction — the pure-LLM boundary is untouched;
+  voice-commanded saving stays in the Later tool-calling framing.
+
+### Notes
+- Athena Live renumbers to **M31.4+**.
+- Gate: ruff + mypy exit 0 + 621 pytest + 57 vitest (3 new).
+
 ## [3.1.2] — Milestone 31.2 — Audible turn indicator
 
 **App bumped to 3.1.2.** Spec: `docs/specs/M31.2-turn-earcon.md` — the first

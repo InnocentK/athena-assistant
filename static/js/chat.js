@@ -836,6 +836,10 @@ function _finishStreamingBubble(stream, provider, model) {
     minute: "2-digit",
   });
   meta.appendChild(timeSpan);
+  // M31.3: the bubble text is authoritative here (reconciled before this
+  // call), byte-identical to what history records. Same provider→time→Save
+  // order as appendMessage's meta line.
+  meta.appendChild(_replySaveButton(stream.bubble.textContent));
   stream.wrapper.appendChild(meta);
 }
 
@@ -1082,6 +1086,46 @@ function buildUsageText(diag) {
  * @param {string|null} model     — shown in .meta alongside provider
  * @param {boolean} [isWelcome]   — omit timestamp and provider label
  */
+/**
+ * M31.3: a small per-reply "Save" button → the reply text is uploaded as a
+ * markdown file through the EXISTING /files/upload envelope (sanitized
+ * name, exclusive create, size cap, data/uploads/ only — no new write
+ * path). User-initiated by construction: the pure-LLM provider policy
+ * (M30.7) is untouched, the model never gains an action.
+ */
+function _replySaveButton(text) {
+  const btn = document.createElement("button");
+  btn.className = "reply-save-btn";
+  btn.textContent = "Save";
+  btn.title = "Save this reply as a markdown file (data/uploads/)";
+  btn.addEventListener("click", async function () {
+    btn.disabled = true;
+    try {
+      const stamp = new Date()
+        .toISOString()
+        .replace(/[-:]/g, "")
+        .replace("T", "-")
+        .slice(0, 15); // YYYYMMDD-HHMMSS
+      const form = new FormData();
+      form.append(
+        "file",
+        new Blob([text], { type: "text/markdown" }),
+        "reply-" + stamp + ".md"
+      );
+      const res = await fetch("/files/upload", { method: "POST", body: form });
+      if (!res.ok) throw new Error("upload failed");
+      const data = await res.json().catch(function () { return {}; });
+      btn.textContent = "Saved ✓";
+      if (data.path) btn.title = "Saved as " + data.path;
+      // stays disabled — one file per click, visible in the Files tab
+    } catch (_) {
+      btn.textContent = "Save failed";
+      btn.disabled = false; // let the user retry
+    }
+  });
+  return btn;
+}
+
 function appendMessage(role, content, provider, model, isWelcome) {
   // Wrapper div
   const wrapper = document.createElement("div");
@@ -1115,6 +1159,10 @@ function appendMessage(role, content, provider, model, isWelcome) {
       minute: "2-digit",
     });
     meta.appendChild(timeSpan);
+
+    if (role === "assistant") {
+      meta.appendChild(_replySaveButton(content)); // M31.3 (never on errors)
+    }
 
     wrapper.appendChild(meta);
   }

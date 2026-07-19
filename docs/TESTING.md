@@ -117,6 +117,12 @@ turn (M26.10); `done.response` is authoritative when chunks drift. The
 pre-M30 send tests keep exercising the buffered path by having their fetch
 mock report `/chat/stream` unavailable.
 
+`saveReply.test.js` (M31.3) covers the per-reply Save button: streamed and
+buffered replies carry it, a click POSTs multipart to `/files/upload` with
+a `reply-*.md` filename whose content is byte-identical to the rendered
+reply, success flips to "Saved ✓"/disabled, failure re-enables for retry,
+and welcome/error bubbles never get the button.
+
 `conversationMode.test.js` (M31.0, 17 tests) covers conversation mode with
 fake speech APIs + SSE streams: the sentence splitter (terminator+whitespace
 boundaries, never end-of-buffer, the 12-char abbreviation guard, decimals,

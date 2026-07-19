@@ -490,6 +490,14 @@ This file is the durable contract; per-release history lives in
   same arming click, it blips ONLY from the auto-reopen path (both call
   sites count-pinned), and any Web Audio failure is a silent no-op — the
   loop must never depend on the earcon.
+- **Save-reply writes through the upload envelope ONLY (M31.3).** The
+  per-reply Save button posts the reply text to the existing
+  `POST /files/upload` — never a new write endpoint (the upload path's
+  sanitization/exclusive-create/cap/`data/uploads/`-containment is the ONE
+  browser-reachable write envelope; a second one doubles the audit
+  surface). It is user-initiated by construction: providers stay pure LLMs
+  (M30.7) and never gain a save action. Error bubbles never get the button.
+  Call-site count is test-pinned.
 - **`voice.enqueue()` never cancels (M31.0).** It is the sentence-queueing
   primitive — a cancel inside it would clip the sentence currently being
   spoken every time a new chunk arrived. `speak()` keeps cancel-then-say
