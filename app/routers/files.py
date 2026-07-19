@@ -14,7 +14,7 @@ import asyncio
 import re
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Form, HTTPException, Query, UploadFile
 
 from core.config import APP_ROOT
 
@@ -183,8 +183,18 @@ _UPLOAD_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
 _UPLOAD_SAFE_CHAR = re.compile(r"[^A-Za-z0-9._-]")
 
 
+# M31.4: the ONLY browser-writable destinations — a fixed enum, never a
+# client-controlled path. "uploads" = files the user sends in (M29.3 attach
+# flow, the default); "saved" = assistant replies the user chose to keep.
+_UPLOAD_DESTS = ("uploads", "saved")
+
+
 def _uploads_dir():
     return APP_ROOT / "data" / "uploads"
+
+
+def _dest_dir(dest: str):
+    return APP_ROOT / "data" / dest
 
 
 def _sanitize_upload_name(raw: str | None) -> str:
@@ -194,9 +204,9 @@ def _sanitize_upload_name(raw: str | None) -> str:
     return name or "upload"
 
 
-def _open_unique_exclusive(name: str):
+def _open_unique_exclusive(name: str, base):
     """
-    Create-and-open data/uploads/<name> (suffixed -1, -2, … on collision),
+    Create-and-open <base>/<name> (suffixed -1, -2, … on collision),
     returning ``(file_handle, path)``.
 
     REVIEW-3.0 F1: the file is opened with ``"xb"`` (exclusive create), so the
@@ -204,7 +214,6 @@ def _open_unique_exclusive(name: str):
     the create race and simply retries the next suffix. Never replace this
     with an exists()-check + ``"wb"`` (that was the race).
     """
-    base = _uploads_dir()
     stem, dot, ext = name.partition(".")
     for i in range(1000):
         if i == 0:
@@ -218,21 +227,28 @@ def _open_unique_exclusive(name: str):
     raise HTTPException(status_code=409, detail="Too many files with this name.")
 
 
-@router.post("/files/upload", summary="Upload a file to data/uploads/ (M29.3)")
-async def files_upload(file: UploadFile) -> dict[str, Any]:
+@router.post("/files/upload", summary="Upload a file to data/uploads/ or data/saved/ (M29.3/M31.4)")
+async def files_upload(file: UploadFile, dest: str = Form("uploads")) -> dict[str, Any]:
     """
-    Save an uploaded file under data/uploads/ (allowlisted read/write in the
-    shipped config, so the existing /files/read machinery serves it).
+    Save an uploaded file under data/uploads/ — or, M31.4, data/saved/ (the
+    save-reply destination) via the optional ``dest`` field. Both live under
+    the wholesale-allowlisted data/ dir, so the existing /files/read
+    machinery serves them.
 
-    The name is fully sanitized server-side; content is opaque bytes (never
+    ``dest`` is a fixed two-entry enum validated BEFORE any filesystem
+    touch — this endpoint must never grow a client-controlled path. The
+    name is fully sanitized server-side; content is opaque bytes (never
     executed or parsed); 10 MB cap enforced while streaming (partial file
     removed on breach); collisions get a unique suffix.
     """
+    if dest not in _UPLOAD_DESTS:
+        raise HTTPException(status_code=400, detail="Unknown destination.")
     name = _sanitize_upload_name(file.filename)
 
     def _save() -> dict[str, Any]:
-        _uploads_dir().mkdir(parents=True, exist_ok=True)
-        fh, target = _open_unique_exclusive(name)
+        base = _dest_dir(dest)
+        base.mkdir(parents=True, exist_ok=True)
+        fh, target = _open_unique_exclusive(name, base)
         written = 0
         try:
             with fh:
@@ -256,7 +272,7 @@ async def files_upload(file: UploadFile) -> dict[str, Any]:
         return {
             "uploaded": True,
             "name": target.name,
-            "path": f"data/uploads/{target.name}",
+            "path": f"data/{dest}/{target.name}",
             "bytes": written,
         }
 
@@ -264,7 +280,7 @@ async def files_upload(file: UploadFile) -> dict[str, Any]:
     main.write_ops_event(
         event="file_upload",
         outcome="success",
-        detail={"name": result["name"], "bytes": result["bytes"]},
+        detail={"name": result["name"], "bytes": result["bytes"], "dest": dest},
     )
     return result
 

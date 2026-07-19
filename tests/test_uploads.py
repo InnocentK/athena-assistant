@@ -91,3 +91,43 @@ def test_concurrent_same_name_uploads_never_overwrite(client):
         (cc.APP_ROOT / "data" / "uploads" / n).read_bytes() for n in names
     }
     assert contents == {b"payload-A", b"payload-B"}     # both intact
+
+
+# --- M31.4: the `dest` destination enum (save-reply → data/saved/) -----------
+
+def test_upload_dest_saved_lands_in_data_saved(client):
+    resp = client.post(
+        "/files/upload",
+        data={"dest": "saved"},
+        files={"file": ("Notes-on-Ganymede.md", b"# Notes\nGanymede.", "text/markdown")},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["path"] == "data/saved/Notes-on-Ganymede.md"
+
+    # readable through the EXISTING allowlisted read path (data/ is wholesale)
+    read = client.get("/files/read", params={"path": data["path"]})
+    assert read.status_code == 200
+    assert "Ganymede" in read.json()["content"]
+
+
+def test_upload_dest_unknown_is_400_and_writes_nothing(client):
+    import core.config as cc
+
+    resp = client.post(
+        "/files/upload",
+        data={"dest": "../evil"},
+        files={"file": ("x.md", b"content", "text/markdown")},
+    )
+    assert resp.status_code == 400
+    # the enum check runs BEFORE any filesystem touch
+    assert not (cc.APP_ROOT / "data" / ".." / "evil").exists()
+    assert not list((cc.APP_ROOT / "data").glob("**/x.md"))
+
+
+def test_upload_default_dest_is_still_uploads(client):
+    resp = client.post(
+        "/files/upload", files={"file": ("attach.txt", b"plain attach", "text/plain")}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["path"] == "data/uploads/attach.txt"

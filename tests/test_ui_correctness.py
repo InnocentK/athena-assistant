@@ -193,17 +193,33 @@ def test_hands_free_loop_requires_gesture_and_stops_everywhere():
     assert _CHAT_JS.count("_earconUnlock(") == 2
 
 
-# --- M31.3: save reply as file — structure pins -------------------------------
+# --- M31.3/M31.4: save reply as file — structure pins --------------------------
 
 def test_save_reply_reuses_upload_envelope():
     # The per-reply Save button is USER-initiated (the pure-LLM provider
-    # policy is untouched) and posts through the EXISTING /files/upload
-    # envelope — definition + exactly two render call sites (appendMessage
-    # assistant meta + _finishStreamingBubble). A new write endpoint here
-    # would be a second filesystem write path — do not.
+    # policy is untouched) and its server copy posts through the EXISTING
+    # /files/upload envelope with the FIXED dest enum — definition + exactly
+    # two render call sites (appendMessage assistant meta +
+    # _finishStreamingBubble). A new write endpoint here would be a second
+    # filesystem write path — do not.
     assert _CHAT_JS.count("_replySaveButton(") == 3
     seg = _CHAT_JS[_CHAT_JS.index("function _replySaveButton"):]
-    seg = seg[:seg.index("\nfunction ")]
-    assert '"/files/upload"' in seg      # the one write path
-    assert "reply-" in seg               # timestamped .md naming
+    seg = seg[:seg.index("\nfunction appendMessage")]
+    assert '"/files/upload"' in seg           # the one write path
+    assert '("dest", "saved")' in seg         # the fixed enum value, literal
     assert ".reply-save-btn" in _CHAT_CSS
+
+
+def test_save_reply_filenames_and_prefs():
+    # M31.4: derived filenames (heading/first-words; timestamp fallback
+    # keeps the reply- prefix) — definition + the ONE call inside the save
+    # button; destinations are browser-local prefs with server ON / device
+    # OFF defaults (shipping M31.3 behavior preserved).
+    assert _CHAT_JS.count("_replyFilename(") == 2
+    fn_seg = _CHAT_JS[_CHAT_JS.index("function _replyFilename"):]
+    fn_seg = fn_seg[:fn_seg.index("\nfunction ")]
+    assert '"reply-"' in fn_seg or "'reply-'" in fn_seg
+    assert '_SAVE_PREFS_KEY = "athena-save-prefs"' in _CHAT_JS
+    assert "server: true" in _CHAT_JS
+    assert "device: false" in _CHAT_JS
+    assert '"Saving replies"' in _CHAT_JS     # the settings section exists

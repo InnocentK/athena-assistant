@@ -78,6 +78,43 @@ function setVoicePref(key, value) {
 
 
 /* ---------------------------------------------------------
+   Save-reply preferences (M31.4) — per-BROWSER, like the M30.6
+   voice prefs (device-level interaction settings, never
+   profile.yaml). server → data/saved/ on the Athena host;
+   device → browser download of the same file.
+   --------------------------------------------------------- */
+const _SAVE_PREFS_KEY = "athena-save-prefs";
+const _SAVE_PREF_DEFAULTS = { server: true, device: false };
+let _savePrefsMem = null; // fallback when localStorage throws (private mode)
+
+function getSavePrefs() {
+  if (_savePrefsMem) return Object.assign({}, _SAVE_PREF_DEFAULTS, _savePrefsMem);
+  try {
+    const raw = window.localStorage.getItem(_SAVE_PREFS_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return Object.assign({}, _SAVE_PREF_DEFAULTS, parsed);
+  } catch (_) {
+    _savePrefsMem = {};
+    return Object.assign({}, _SAVE_PREF_DEFAULTS);
+  }
+}
+
+function setSavePref(key, value) {
+  const prefs = getSavePrefs();
+  prefs[key] = value;
+  if (_savePrefsMem) {
+    _savePrefsMem = prefs;
+    return;
+  }
+  try {
+    window.localStorage.setItem(_SAVE_PREFS_KEY, JSON.stringify(prefs));
+  } catch (_) {
+    _savePrefsMem = prefs;
+  }
+}
+
+
+/* ---------------------------------------------------------
    Conversation mode (M31.0) — streaming speech, hands-free
    loop, and barge-in. Everything here is gated on the
    `conversation` pref (default OFF): with it off, behavior is
@@ -838,8 +875,9 @@ function _finishStreamingBubble(stream, provider, model) {
   meta.appendChild(timeSpan);
   // M31.3: the bubble text is authoritative here (reconciled before this
   // call), byte-identical to what history records. Same provider→time→Save
-  // order as appendMessage's meta line.
-  meta.appendChild(_replySaveButton(stream.bubble.textContent));
+  // order as appendMessage's meta line; null when saving is off (M31.4).
+  const saveBtn = _replySaveButton(stream.bubble.textContent);
+  if (saveBtn) meta.appendChild(saveBtn);
   stream.wrapper.appendChild(meta);
 }
 
@@ -1087,41 +1125,105 @@ function buildUsageText(diag) {
  * @param {boolean} [isWelcome]   — omit timestamp and provider label
  */
 /**
- * M31.3: a small per-reply "Save" button → the reply text is uploaded as a
- * markdown file through the EXISTING /files/upload envelope (sanitized
- * name, exclusive create, size cap, data/uploads/ only — no new write
- * path). User-initiated by construction: the pure-LLM provider policy
- * (M30.7) is untouched, the model never gains an action.
+ * M31.4: derive a meaningful filename from the reply itself — the first
+ * markdown heading if there is one, else the first ~6 words; the M31.3
+ * `reply-<timestamp>` naming survives only as the fallback for content
+ * that yields no usable slug. Deliberately dumb (no model-suggested-name
+ * parsing); the server re-sanitizes and unique-suffixes on collision.
+ */
+function _replyFilename(text) {
+  let candidate = "";
+  const lines = String(text || "").split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    if (line.charAt(0) === "#") {
+      candidate = line.replace(/^#+\s*/, "");
+    } else {
+      candidate = line.split(/\s+/).slice(0, 6).join(" ");
+    }
+    break;
+  }
+  let slug = candidate
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/^[-_.]+/, "")
+    .slice(0, 40)
+    .replace(/[-_.]+$/, "");
+  if (slug.length < 3) {
+    const stamp = new Date()
+      .toISOString()
+      .replace(/[-:]/g, "")
+      .replace("T", "-")
+      .slice(0, 15); // YYYYMMDD-HHMMSS
+    slug = "reply-" + stamp;
+  }
+  return slug + ".md";
+}
+
+/** M31.4: hand the reply to the browser's download flow (client-side only —
+ *  no server involvement, nothing recorded). */
+function _downloadReply(text, filename) {
+  const blob = new Blob([text], { type: "text/markdown" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+}
+
+/**
+ * M31.3/M31.4: a small per-reply "Save" button. User-initiated by
+ * construction — the pure-LLM provider policy (M30.7) is untouched, the
+ * model never gains an action. Destinations honor the Settings toggles AT
+ * CLICK TIME: server → the EXISTING /files/upload envelope with the fixed
+ * dest enum (data/saved/ — sanitized name, exclusive create, size cap; no
+ * new write path), device → a client-side download of the same file.
+ * Returns null when both destinations are disabled (feature off).
  */
 function _replySaveButton(text) {
+  const sp0 = getSavePrefs();
+  if (!sp0.server && !sp0.device) return null;
   const btn = document.createElement("button");
   btn.className = "reply-save-btn";
   btn.textContent = "Save";
-  btn.title = "Save this reply as a markdown file (data/uploads/)";
+  btn.title = "Save this reply as a markdown file";
   btn.addEventListener("click", async function () {
-    btn.disabled = true;
-    try {
-      const stamp = new Date()
-        .toISOString()
-        .replace(/[-:]/g, "")
-        .replace("T", "-")
-        .slice(0, 15); // YYYYMMDD-HHMMSS
-      const form = new FormData();
-      form.append(
-        "file",
-        new Blob([text], { type: "text/markdown" }),
-        "reply-" + stamp + ".md"
-      );
-      const res = await fetch("/files/upload", { method: "POST", body: form });
-      if (!res.ok) throw new Error("upload failed");
-      const data = await res.json().catch(function () { return {}; });
-      btn.textContent = "Saved ✓";
-      if (data.path) btn.title = "Saved as " + data.path;
-      // stays disabled — one file per click, visible in the Files tab
-    } catch (_) {
-      btn.textContent = "Save failed";
-      btn.disabled = false; // let the user retry
+    const sp = getSavePrefs(); // click-time truth (instant-apply settings)
+    if (!sp.server && !sp.device) {
+      btn.textContent = "Enable saving in Settings";
+      return;
     }
+    btn.disabled = true;
+    const filename = _replyFilename(text);
+    const outcomes = [];
+    if (sp.device) {
+      try {
+        _downloadReply(text, filename);
+        outcomes.push("downloaded " + filename);
+      } catch (_) {} // download failure must not block the server save
+    }
+    if (sp.server) {
+      try {
+        const form = new FormData();
+        form.append("dest", "saved");
+        form.append("file", new Blob([text], { type: "text/markdown" }), filename);
+        const res = await fetch("/files/upload", { method: "POST", body: form });
+        if (!res.ok) throw new Error("upload failed");
+        const data = await res.json().catch(function () { return {}; });
+        outcomes.push(data.path ? "saved as " + data.path : "saved");
+      } catch (_) {
+        btn.textContent = "Save failed";
+        btn.title = outcomes.length
+          ? "Server save failed (" + outcomes.join(", ") + ")"
+          : "Server save failed — click to retry";
+        btn.disabled = false; // let the user retry
+        return;
+      }
+    }
+    btn.textContent = "Saved ✓";
+    btn.title = outcomes.join(" · ");
+    // stays disabled — one save per click
   });
   return btn;
 }
@@ -1161,7 +1263,8 @@ function appendMessage(role, content, provider, model, isWelcome) {
     meta.appendChild(timeSpan);
 
     if (role === "assistant") {
-      meta.appendChild(_replySaveButton(content)); // M31.3 (never on errors)
+      const saveBtn = _replySaveButton(content); // M31.3 (never on errors)
+      if (saveBtn) meta.appendChild(saveBtn); // null when saving is off (M31.4)
     }
 
     wrapper.appendChild(meta);
@@ -1775,6 +1878,24 @@ async function loadSettingsProfile() {
       "(headphones recommended; it implies speak + auto-send while on).";
     body.appendChild(voiceNote);
 
+    // --- Saving replies (M31.4) — per-BROWSER prefs, applied instantly.
+    body.appendChild(_settingsSectionTitle("Saving replies"));
+    const sp = getSavePrefs();
+    body.appendChild(
+      _savePrefToggleRow("Save to server (data/saved)", "server", sp.server)
+    );
+    body.appendChild(
+      _savePrefToggleRow("Save to this device (download)", "device", sp.device)
+    );
+    const saveNote = document.createElement("div");
+    saveNote.className = "settings-note";
+    saveNote.textContent =
+      "Controls the Save button on assistant replies: keep a copy on the " +
+      "Athena server (browsable in Files, re-attachable), download to this " +
+      "device, or both. With both off, the button disappears. Saved in this " +
+      "browser (not the profile).";
+    body.appendChild(saveNote);
+
     // --- Read-only context (not editable in this milestone) ---
     body.appendChild(_settingsSectionTitle("Tools"));
     const tools = Array.isArray(p.allowed_tools) ? p.allowed_tools : [];
@@ -1801,6 +1922,17 @@ function _settingsSelect(options, current) {
     sel.appendChild(o);
   });
   return sel;
+}
+
+/** M31.4: one instant-apply save-pref checkbox row (athena-save-prefs). */
+function _savePrefToggleRow(label, prefKey, checked) {
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.checked = !!checked;
+  cb.addEventListener("change", function () {
+    setSavePref(prefKey, cb.checked);
+  });
+  return _settingsControlRow(label, cb);
 }
 
 /** M30.6: one instant-apply voice-pref checkbox row (localStorage-backed).
@@ -2187,9 +2319,11 @@ async function loadHistoryFiles(showInternal) {
         body: JSON.stringify({ pattern: pattern, exclude_internal: !showInternal }),
       });
     }
-    const [res, resUploads] = await Promise.all([
+    const [res, resUploads, resSaved] = await Promise.all([
       search("*"),
       search("uploads/*").catch(function () { return null; }),
+      // M31.4: saved replies live beside uploads; merge is best-effort too.
+      search("saved/*").catch(function () { return null; }),
     ]);
     if (token !== _panelLoadToken.history) return; // superseded by a newer load
     if (!res.ok) {
@@ -2197,11 +2331,14 @@ async function loadHistoryFiles(showInternal) {
       return;
     }
     const paths = await res.json();
-    if (resUploads && resUploads.ok) {
+    const extraListings = [resUploads, resSaved]; // M31.4: same merge for both
+    for (let x = 0; x < extraListings.length; x++) {
+      const extra = extraListings[x];
+      if (!extra || !extra.ok) continue;
       try {
-        const uploadPaths = await resUploads.json();
-        if (Array.isArray(uploadPaths)) {
-          uploadPaths.forEach(function (p) {
+        const extraPaths = await extra.json();
+        if (Array.isArray(extraPaths)) {
+          extraPaths.forEach(function (p) {
             if (paths.indexOf(p) === -1) paths.push(p);
           });
         }

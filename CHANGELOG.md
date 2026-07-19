@@ -4,6 +4,35 @@ All notable changes to Athena Assistant. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project versions
 each milestone as a release. Newest first.
 
+## [3.1.4] — Milestone 31.4 — Save destinations + derived filenames
+
+**App bumped to 3.1.4.** Spec: `docs/specs/M31.4-save-destinations.md` —
+the user's review of M31.3 within hours of shipping (probe iteration
+working as intended): generic `reply-<timestamp>` names discarded the
+obvious title, assistant output didn't belong among *uploads*, and the
+real want was hybrid server-and/or-device saving.
+
+### Added
+- **Derived filenames**: first markdown heading → `Notes-on-Ganymede.md`,
+  else first ~6 words, slugified; `reply-<timestamp>` survives only as the
+  no-usable-slug fallback. Server still re-sanitizes + unique-suffixes.
+- **`data/saved/` destination**: `POST /files/upload` gains an optional
+  `dest` field — a FIXED two-entry enum (`uploads` | `saved`) validated
+  before any filesystem touch; default `uploads` keeps the attach flow
+  byte-identical. Still the ONE browser-reachable write path. `data/` is
+  already wholesale-allowlisted and gitignored, so reads/preview/inlining
+  need no config change; the Files tab merges `saved/*` best-effort.
+- **Device download**: pure client-side Blob→anchor download of the same
+  file (on iOS, the share/Files flow). No server involvement.
+- **Settings → "Saving replies"** (browser-local `athena-save-prefs`,
+  instant-apply): "Save to server (data/saved)" default ON, "Save to this
+  device (download)" default OFF. The button honors CLICK-TIME prefs and
+  performs every enabled action; both off → new replies render no button.
+
+### Notes
+- Athena Live renumbers to **M31.5+**.
+- Gate: ruff + mypy exit 0 + 625 pytest + 61 vitest.
+
 ## [3.1.3] — Milestone 31.3 — Save reply as file
 
 **App bumped to 3.1.3.** Spec: `docs/specs/M31.3-save-reply.md` — probe

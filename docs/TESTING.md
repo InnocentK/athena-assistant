@@ -117,11 +117,16 @@ turn (M26.10); `done.response` is authoritative when chunks drift. The
 pre-M30 send tests keep exercising the buffered path by having their fetch
 mock report `/chat/stream` unavailable.
 
-`saveReply.test.js` (M31.3) covers the per-reply Save button: streamed and
-buffered replies carry it, a click POSTs multipart to `/files/upload` with
-a `reply-*.md` filename whose content is byte-identical to the rendered
-reply, success flips to "Saved ✓"/disabled, failure re-enables for retry,
-and welcome/error bubbles never get the button.
+`saveReply.test.js` (M31.3/M31.4) covers the per-reply Save button:
+derived filenames (heading → `Notes-on-Ganymede.md`, first-words,
+timestamp fallback); the server pref posts multipart `dest=saved` to
+`/files/upload` with content byte-identical to the rendered reply; the
+device pref downloads client-side (object-URL spy, zero upload POSTs);
+both-on does both; both-off renders no button; success flips to
+"Saved ✓"/disabled, failure re-enables for retry, and welcome/error
+bubbles never get the button. Server-side, `test_uploads.py` pins the
+`dest` enum: `saved` lands in `data/saved/`, unknown dests 400 before any
+write, and the default stays `data/uploads/`.
 
 `conversationMode.test.js` (M31.0, 17 tests) covers conversation mode with
 fake speech APIs + SSE streams: the sentence splitter (terminator+whitespace

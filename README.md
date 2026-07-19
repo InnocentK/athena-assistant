@@ -14,7 +14,8 @@ Athena finishes, and talking interrupts her — browser Web Speech, opt-in, see
 [docs/PLATFORMS.md](docs/PLATFORMS.md) for the honest limits), multi-profile
 support, a YAML-backed memory system with a review queue, persistent
 conversations, an allowlisted file browser with uploads (any assistant
-reply can be saved as a markdown file with one click), optional CalDAV /
+reply can be saved as a markdown file — to the server, your device, or
+both), optional CalDAV /
 CardDAV / Nextcloud integrations (read-mostly, disabled by default), provider
 latency + token-usage diagnostics, and editable settings.
 

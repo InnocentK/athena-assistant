@@ -364,7 +364,15 @@ spec; the decision record is this entry.
   EXISTING /files/upload envelope (no new write surface, user-initiated
   by construction). Voice-commanded saving stays in the Later
   tool-calling safety framing.
-- **M31.4+ — Athena Live (self-hosted cascaded voice)** — only if the M31.0
+- **M31.4 — Save destinations + derived filenames** (→ **3.1.4,
+  SHIPPED**; spec `docs/specs/M31.4-save-destinations.md`): the user's
+  same-day review of M31.3. Filenames derive from the reply (heading →
+  slug; timestamp only as fallback); server copies land in `data/saved/`
+  via a FIXED dest enum on the one upload envelope (never a
+  client-controlled path); a client-side device-download option; both
+  governed by Settings → "Saving replies" (browser-local, server ON /
+  device OFF defaults).
+- **M31.5+ — Athena Live (self-hosted cascaded voice)** — only if the M31.0
   probe earns it; staged mini-milestones, spec'd separately: (a) local Piper/
   Kokoro TTS endpoint (better voices than SpeechSynthesis, standalone win);
   (b) WebSocket audio path on FastAPI; (c) server STT via faster-whisper

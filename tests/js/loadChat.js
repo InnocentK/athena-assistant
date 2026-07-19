@@ -31,6 +31,7 @@ const SHIM = `
   sendMessage,
   _splitCompleteSentences,
   _shouldSpeak,
+  _replyFilename,
   get conversationHistory() { return conversationHistory; },
 };
 `;

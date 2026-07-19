@@ -490,14 +490,19 @@ This file is the durable contract; per-release history lives in
   same arming click, it blips ONLY from the auto-reopen path (both call
   sites count-pinned), and any Web Audio failure is a silent no-op — the
   loop must never depend on the earcon.
-- **Save-reply writes through the upload envelope ONLY (M31.3).** The
-  per-reply Save button posts the reply text to the existing
-  `POST /files/upload` — never a new write endpoint (the upload path's
-  sanitization/exclusive-create/cap/`data/uploads/`-containment is the ONE
-  browser-reachable write envelope; a second one doubles the audit
-  surface). It is user-initiated by construction: providers stay pure LLMs
-  (M30.7) and never gain a save action. Error bubbles never get the button.
-  Call-site count is test-pinned.
+- **Save-reply writes through the upload envelope ONLY (M31.3/M31.4).**
+  The per-reply Save button's server copy posts to the existing
+  `POST /files/upload` — never a new write endpoint (that envelope's
+  sanitization/exclusive-create/cap is the ONE browser-reachable write
+  path; a second one doubles the audit surface). M31.4 widened it by a
+  **fixed two-entry `dest` enum** (`uploads` | `saved`), membership-checked
+  BEFORE any filesystem touch — it must never become a client-controlled
+  path (the enum + literal are test-pinned). The device destination is
+  client-side only (Blob→anchor download; no server call). Both remain
+  user-initiated by construction: providers stay pure LLMs (M30.7) and
+  never gain a save action. Error bubbles never get the button; save
+  destination prefs are browser-local (`athena-save-prefs`), never
+  profile.yaml. Call-site counts are test-pinned.
 - **`voice.enqueue()` never cancels (M31.0).** It is the sentence-queueing
   primitive — a cancel inside it would clip the sentence currently being
   spoken every time a new chunk arrived. `speak()` keeps cancel-then-say
