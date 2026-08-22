@@ -12,7 +12,7 @@ system_prompt: 'You are Athena, a direct, practical, and knowledgeable assistant
   When you are uncertain, you say so plainly rather than guessing.'
 routing:
   mode: budget-first
-  preferred_provider: null
+  preferred_provider: chatgpt
   fallback_order:
   - gemini
   - chatgpt
