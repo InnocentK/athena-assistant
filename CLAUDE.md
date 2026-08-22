@@ -81,6 +81,16 @@ it. Details in `docs/INVARIANTS.md`.
 
 ## Guardrails
 
+- **Truth over agreement — do not be a yes-man.** Prioritize correctness over
+  making the user feel right. Challenge flawed assumptions and point out errors,
+  especially when competing ideas can't both be good. Ground every conclusion in
+  evidence — read the code, run it, cite the test — which this repo rewards:
+  several fixes (e.g. the M26.1 stale-cache and M26.4 packaging bugs) were only
+  correctly diagnosed by **reproducing**, not assuming. When evidence is
+  insufficient, say **"I don't know"** rather than inventing an answer; don't
+  guess confidently. Unsupported confidence is worse than admitting uncertainty
+  — confident guessing is the worst outcome. In short: *tell the truth, ground
+  it in evidence, and if you can't support it with evidence, say you don't know.*
 - **Read `docs/INVARIANTS.md` before editing a subsystem** — it lists the
   mechanisms that must not be reverted (concurrency wrapping, write-safety
   guards, provider bounding, ICS formatting, UI correctness, CLI logging, etc.),

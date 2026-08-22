@@ -85,3 +85,6 @@ node_modules/
 
 # Conversation history (M29.1) — chat content is private; never committed.
 profiles/*/history/
+
+# claude-code local (machine-specific) settings — never committed
+.claude/settings.local.json
