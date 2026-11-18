@@ -14,7 +14,7 @@ CLI. For configuration details (providers, routing, integrations) see
 ## 1. Get the code and create a virtualenv
 
 ```bash
-git clone <your-repo-url> athena-assistant
+git clone https://github.com/InnocentK/athena-assistant.git athena-assistant
 cd athena-assistant
 
 python3 -m venv .venv
