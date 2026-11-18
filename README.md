@@ -23,7 +23,7 @@ latency + token-usage diagnostics, and editable settings.
 
 ```bash
 # 1. Code + virtualenv
-git clone <your-repo-url> athena-assistant && cd athena-assistant
+git clone https://github.com/InnocentK/athena-assistant.git athena-assistant && cd athena-assistant
 python3 -m venv .venv && source .venv/bin/activate
 
 # 2. Dependencies + the athena CLI command
