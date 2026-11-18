@@ -131,3 +131,7 @@ no API keys needed to run the suite.
 
 Athena is built milestone by milestone; see [CHANGELOG.md](CHANGELOG.md) for the
 history and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
+
+## License
+
+Copyright 2026 Innocent Kironji. Licensed under the Apache License, Version 2.0; see `LICENSE`.
